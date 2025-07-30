@@ -4,6 +4,11 @@ pub mod ttl;
 pub mod eviction;
 pub mod persistence;
 pub mod cluster;
+pub mod config;
+pub mod log;
+pub mod metrics;
+pub mod trace;
+pub mod shutdown;
 
 pub use store::{Store, Key};
 pub use value::Value;
@@ -11,3 +16,6 @@ pub use ttl::TTLStore;
 pub use eviction::{EvictionStore, EvictionPolicy, EvictionConfig};
 pub use persistence::{PersistenceStore, PersistenceConfig, PersistenceCommand};
 pub use cluster::{ClusterManager, ClusterConfig, ClusterStatus};
+pub use config::{CacheConfig, ServerConfig, StorageConfig, ClusterConfig as ConfigClusterConfig, PersistenceConfig as ConfigPersistenceConfig, LoggingConfig, MetricsConfig, TracingConfig};
+pub use metrics::{MetricsCollector, MetricsSummary};
+pub use shutdown::{ShutdownCoordinator, ShutdownHandle, GracefulShutdownManager, ShutdownComponent, ShutdownSignal};
