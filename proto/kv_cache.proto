@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package kv_cache;
+
+// The KV Cache service for inter-node communication
+service KvCacheService {
+  // Forward a request to another node
+  rpc ForwardRequest (Request) returns (Response);
+  
+  // Replicate data to followers
+  rpc ReplicateData (ReplicateRequest) returns (ReplicateResponse);
+  
+  // Health check between nodes
+  rpc HealthCheck (HealthRequest) returns (HealthResponse);
+  
+  // Get cluster membership information
+  rpc GetMembership (MembershipRequest) returns (MembershipResponse);
+  
+  // Join the cluster
+  rpc JoinCluster (JoinRequest) returns (JoinResponse);
+  
+  // Leave the cluster
+  rpc LeaveCluster (LeaveRequest) returns (LeaveResponse);
+}
+
+// Basic request/response for forwarded operations
+message Request {
+  string operation = 1;  // GET, SET, DEL, etc.
+  string key = 2;
+  string value = 3;      // For SET operations
+  int64 ttl_seconds = 4; // For SET with TTL
+}
+
+message Response {
+  bool success = 1;
+  string data = 2;       // Response data
+  string error = 3;      // Error message if success = false
+}
+
+// Replication messages
+message ReplicateRequest {
+  string operation = 1;
+  string key = 2;
+  string value = 3;
+  int64 ttl_seconds = 4;
+  int64 timestamp = 5;   // For ordering
+}
+
+message ReplicateResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Health check messages
+message HealthRequest {
+  string node_id = 1;
+  int64 timestamp = 2;
+}
+
+message HealthResponse {
+  bool healthy = 1;
+  string node_id = 2;
+  int64 timestamp = 3;
+  map<string, string> metadata = 4; // Additional health info
+}
+
+// Cluster membership messages
+message MembershipRequest {
+  string requesting_node_id = 1;
+}
+
+message MembershipResponse {
+  repeated NodeInfo nodes = 1;
+  int64 cluster_version = 2;
+}
+
+message NodeInfo {
+  string node_id = 1;
+  string address = 2;
+  int32 port = 3;
+  NodeStatus status = 4;
+  int64 last_seen = 5;
+}
+
+enum NodeStatus {
+  UNKNOWN = 0;
+  ACTIVE = 1;
+  INACTIVE = 2;
+  JOINING = 3;
+  LEAVING = 4;
+}
+
+// Join/Leave cluster messages
+message JoinRequest {
+  string node_id = 1;
+  string address = 2;
+  int32 port = 3;
+  map<string, string> metadata = 4;
+}
+
+message JoinResponse {
+  bool accepted = 1;
+  string error = 2;
+  repeated NodeInfo cluster_members = 3;
+}
+
+message LeaveRequest {
+  string node_id = 1;
+  bool graceful = 2; // Whether to wait for data migration
+}
+
+message LeaveResponse {
+  bool accepted = 1;
+  string error = 2;
+} 
