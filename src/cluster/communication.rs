@@ -288,6 +288,14 @@ pub struct KvCacheClient {
     client: kv_cache::kv_cache_service_client::KvCacheServiceClient<tonic::transport::Channel>,
 }
 
+impl std::fmt::Debug for KvCacheClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KvCacheClient")
+            .field("client", &"<tonic_client>")
+            .finish()
+    }
+}
+
 impl KvCacheClient {
     /// Create a new client connected to a specific node
     pub async fn connect(addr: String) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
