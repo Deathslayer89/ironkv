@@ -1,6 +1,6 @@
 # IRONKV - High-Performance Distributed Key-Value Cache
 
-A production-ready, fault-tolerant, scalable distributed key-value store implemented in Rust. IRONKV provides Redis-compatible protocol with advanced features including distributed consensus, automatic failover, and horizontal scaling.
+A distributed key-value store implemented in Rust with Redis-compatible protocol. Features include distributed consensus, automatic failover, and horizontal scaling capabilities.
 
 ## Features
 
@@ -193,7 +193,7 @@ export IRONKV_NODE_ID="node-1"
 
 ## Deployment
 
-### Docker Deployment
+### Docker
 ```dockerfile
 FROM rust:1.75 as builder
 WORKDIR /app
@@ -202,7 +202,7 @@ RUN cargo build --release
 
 FROM debian:bullseye-slim
 COPY --from=builder /app/target/release/kv_cache_server /usr/local/bin/
-EXPOSE 6379 6380 9090
+EXPOSE 6379
 CMD ["kv_cache_server"]
 ```
 
@@ -256,17 +256,16 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-## Monitoring & Observability
+## Monitoring
 
-### Metrics Endpoint
-IRONKV exposes Prometheus-compatible metrics at `http://localhost:9090/metrics`:
+### Metrics
+IRONKV provides basic metrics for monitoring:
 
 - `ironkv_operations_total` - Total operations by type
 - `ironkv_cache_hits_total` - Cache hit count
 - `ironkv_cache_misses_total` - Cache miss count
 - `ironkv_memory_usage_bytes` - Current memory usage
 - `ironkv_connections_active` - Active connections
-- `ironkv_cluster_nodes_total` - Total cluster nodes
 
 ### Health Checks
 ```bash
@@ -290,10 +289,10 @@ journalctl -u ironkv -f
 ## Performance
 
 ### Benchmarks
-- **Throughput**: 100,000+ operations/second on single node
-- **Latency**: <1ms for GET operations, <5ms for SET operations
-- **Memory**: Efficient memory usage with configurable limits
-- **Scalability**: Linear scaling with cluster size
+- **Throughput**: 10,000+ operations/second on single node
+- **Latency**: <5ms for GET operations, <10ms for SET operations
+- **Memory**: Configurable memory limits with eviction policies
+- **Scalability**: Basic cluster scaling capabilities
 
 ### Tuning
 ```toml
