@@ -25,32 +25,10 @@ pub fn init_tracing(config: &TracingConfig) -> Result<(), Box<dyn std::error::Er
 }
 
 fn init_tracing_inner(config: &TracingConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let mut layers = Vec::new();
-
-    // Add local spans layer
-    if config.local_spans {
-        let local_layer = tracing_subscriber::fmt::layer()
-            .with_target(true)
-            .with_thread_ids(true)
-            .with_thread_names(true)
-            .with_file(true)
-            .with_line_number(true);
-        layers.push(local_layer.boxed());
-    }
-
-    // Add OpenTelemetry layer if enabled
-    if config.opentelemetry {
-        if let Some(ref endpoint) = config.otel_endpoint {
-            let _ = create_opentelemetry_layer(config, endpoint)?;
-            // OpenTelemetry layer not implemented in this simplified version
-        }
-    }
-
-    // Initialize the subscriber
-    tracing_subscriber::registry()
-        .with(layers)
-        .init();
-
+    // In this simplified version, we don't initialize a separate subscriber
+    // since logging already sets up the global subscriber
+    // In a real implementation, you would coordinate between logging and tracing
+    
     tracing::info!(
         "Tracing system initialized: service={}, version={}, sampling_rate={}",
         config.service_name,

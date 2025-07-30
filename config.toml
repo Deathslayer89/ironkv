@@ -1,0 +1,75 @@
+[server]
+bind_address = "127.0.0.1"
+port = 6380
+max_connections = 500
+connection_timeout = 30
+request_timeout = 60
+graceful_shutdown = true
+shutdown_timeout = 30
+
+[storage]
+max_memory_bytes = 1073741824
+max_keys = 1000000
+eviction_policy = "LRU"
+default_ttl_seconds = 0
+enable_ttl_cleanup = true
+ttl_cleanup_interval = 60
+ttl_cleanup_sample_size = 1000
+
+[cluster]
+node_id = "node-1"
+bind_address = "127.0.0.1"
+port = 50051
+heartbeat_interval = 5
+failure_timeout = 15
+replication_factor = 2
+virtual_nodes_per_physical = 150
+replication_strategy = "Asynchronous"
+enabled = false
+
+[cluster.members]
+
+[persistence]
+enabled = false
+data_dir = "./data"
+aof_path = "./data/appendonly.aof"
+snapshot_path = "./data/snapshot.rdb"
+enable_aof = true
+snapshot_interval = 3600
+max_aof_size = 104857600
+enable_aof_rewrite = true
+
+[persistence.aof_sync_policy]
+Every = 1
+
+[logging]
+level = "Debug"
+format = "Simple"
+console = true
+structured = true
+
+[logging.rotation]
+enabled = true
+max_size = 104857600
+max_files = 5
+interval = "Daily"
+
+[metrics]
+enabled = true
+bind_address = "127.0.0.1"
+port = 9091
+path = "/metrics"
+prometheus = true
+collection_interval = 15
+histograms = true
+
+[metrics.labels]
+
+[tracing]
+enabled = true
+service_name = "kv-cache-example"
+service_version = "1.0.0"
+sampling_rate = 0.5
+opentelemetry = false
+local_spans = true
+max_span_duration = 60

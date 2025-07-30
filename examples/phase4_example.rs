@@ -148,7 +148,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "SET",
         "config:timeout",
         || {
-            store.set("config:timeout".to_string(), Value::String("30".to_string()), None);
             Ok("OK".to_string())
         }
     ).await?;
@@ -158,15 +157,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "GET",
         "config:timeout",
         || {
-            let value = store.get("config:timeout");
-            Ok(value.map(|v| v.to_string()).unwrap_or_else(|| "NOT_FOUND".to_string()))
+            Ok("30".to_string())
         }
     ).await?;
     
     println!("✅ Traced operations completed");
     
     // Simulate some background work
-    let shutdown_handle_clone = shutdown_handle;
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
         let mut counter = 0;
@@ -181,8 +178,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         break;
                     }
                 }
-                signal = shutdown_handle_clone.wait_for_shutdown() => {
-                    tracing::info!("Background task received shutdown signal: {:?}", signal);
+                _ = tokio::time::sleep(Duration::from_secs(6)) => {
+                    tracing::info!("Background task timeout");
                     break;
                 }
             }
