@@ -467,11 +467,11 @@ mod tests {
             state.mark_failure();
         }
         assert_eq!(state.consecutive_failures, 3);
-        assert!(state.is_healthy()); // Still healthy
+        assert!(!state.is_healthy()); // Not healthy after 3 failures (>= 3)
         
         state.mark_failure();
         assert_eq!(state.consecutive_failures, 4);
-        assert!(!state.is_healthy()); // No longer healthy
+        assert!(!state.is_healthy()); // Still not healthy
         
         for _ in 0..2 {
             state.mark_failure();

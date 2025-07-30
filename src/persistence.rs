@@ -102,6 +102,11 @@ impl PersistenceStore {
     }
 
     async fn initialize_aof_writer(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure the parent directory exists
+        if let Some(parent) = self.config.aof_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        
         let file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -370,6 +375,11 @@ impl PersistenceStore {
                            config: &PersistenceConfig) -> Result<(), Box<dyn std::error::Error>> {
         let data = data.read().await;
         
+        // Ensure the parent directory exists
+        if let Some(parent) = config.snapshot_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        
         // Create a temporary file first
         let mut temp_path = config.snapshot_path.clone();
         temp_path.set_extension("tmp");
@@ -459,6 +469,11 @@ impl PersistenceStore {
     async fn rewrite_aof(data: &HashMap<String, (Value, Option<std::time::Instant>)>,
                         config: &PersistenceConfig,
                         aof_writer: &Arc<RwLock<Option<BufWriter<File>>>>) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure the parent directory exists
+        if let Some(parent) = config.aof_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        
         // Create a new AOF file
         let mut new_aof_path = config.aof_path.clone();
         new_aof_path.set_extension("new");

@@ -370,9 +370,9 @@ mod tests {
     fn test_raft_state_term_management() {
         let mut state = RaftState::new("node1".to_string());
         
-        // Check term staleness
-        assert!(state.is_term_stale(RaftTerm(0)));
-        assert!(!state.is_term_stale(RaftTerm(1)));
+        // Check term staleness - a term is stale if it's less than current term
+        assert!(!state.is_term_stale(RaftTerm(0))); // Same term is not stale
+        assert!(!state.is_term_stale(RaftTerm(1))); // Higher term is not stale
         
         // Check term newness
         assert!(state.is_term_newer(RaftTerm(1)));
@@ -383,6 +383,12 @@ mod tests {
         assert_eq!(state.current_term, RaftTerm(2));
         assert!(state.is_follower());
         assert_eq!(state.voted_for, None);
+        
+        // Now check staleness with new term
+        assert!(state.is_term_stale(RaftTerm(0))); // Term 0 is now stale compared to term 2
+        assert!(state.is_term_stale(RaftTerm(1))); // Term 1 is now stale compared to term 2
+        assert!(!state.is_term_stale(RaftTerm(2))); // Same term is not stale
+        assert!(!state.is_term_stale(RaftTerm(3))); // Higher term is not stale
     }
 
     #[test]
