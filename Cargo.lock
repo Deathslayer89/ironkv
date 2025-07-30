@@ -586,12 +586,15 @@ dependencies = [
 name = "kv_cache_core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bincode",
  "chrono",
  "metrics",
  "metrics-exporter-prometheus",
  "prost",
+ "rand",
  "serde",
+ "serde_json",
  "serde_yaml",
  "tempfile",
  "tokio",
