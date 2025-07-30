@@ -3,7 +3,7 @@
 //! This module provides log entry management, persistence, and log operations
 //! for the Raft consensus algorithm.
 
-use crate::consensus::state::{RaftTerm, RaftRole};
+use crate::consensus::state::RaftTerm;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};

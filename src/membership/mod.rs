@@ -8,11 +8,11 @@ pub mod coordinator;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
-use crate::consensus::{RaftConsensus, RaftState, RaftTerm};
+use crate::consensus::{RaftConsensus, RaftTerm};
 use crate::config::ClusterConfig;
 use crate::log::log_cluster_operation;
 use crate::metrics::MetricsCollector;
@@ -213,9 +213,9 @@ impl MembershipManager {
     pub async fn add_node(
         &self,
         node_id: String,
-        address: String,
-        port: u16,
-        datacenter: Option<String>,
+        _address: String,
+        _port: u16,
+        _datacenter: Option<String>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let start_time = SystemTime::now();
 
@@ -358,7 +358,6 @@ impl std::fmt::Display for MembershipStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ClusterConfig;
 
     #[tokio::test]
     async fn test_membership_state_creation() {

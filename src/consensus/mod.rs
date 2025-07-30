@@ -12,12 +12,12 @@ pub mod replication;
 use crate::config::ClusterConfig;
 use crate::log::log_cluster_operation;
 use crate::metrics::MetricsCollector;
-use crate::trace::trace_cluster_operation;
+
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant};
 use tokio::sync::RwLock;
-use tokio::time::timeout;
+
 
 pub use state::{RaftState, RaftRole, RaftTerm};
 pub use log::{LogEntry, LogIndex, LogTerm};
@@ -130,7 +130,7 @@ impl RaftConsensus {
         }
 
         // Get current state
-        let mut state = self.state.write().await;
+        let state = self.state.write().await;
         
         // Create log entry
         let log_entry = LogEntry::new(

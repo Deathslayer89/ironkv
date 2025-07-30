@@ -3,14 +3,14 @@
 //! This module provides leader election logic, timeout management, and
 //! election state tracking for the Raft consensus algorithm.
 
-use crate::consensus::communication::{RaftRpc, RequestVoteRequest, RequestVoteResponse};
-use crate::consensus::log::{LogIndex, LogTerm};
-use crate::consensus::state::{RaftRole, RaftState, RaftTerm};
+use crate::consensus::communication::{RaftRpc, RequestVoteRequest};
+use crate::consensus::log::LogTerm;
+use crate::consensus::state::{RaftState};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
-use tokio::time::{interval, timeout};
+use tokio::time::interval;
 
 /// Election timeout configuration
 #[derive(Debug, Clone)]
@@ -179,7 +179,7 @@ impl ElectionManager {
         let timeout = self.timeout.clone();
         let rpc_client = Arc::clone(&self.rpc_client);
         let members = self.members.clone();
-        let mut election_state = self.election_state.clone();
+        let election_state = self.election_state.clone();
 
         let task_handle = tokio::spawn(async move {
             Self::run_election_loop(state, timeout, rpc_client, members, election_state, stop_rx).await;
@@ -393,7 +393,7 @@ impl std::fmt::Display for ElectionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::communication::{MockRaftClient, MockResponse, RpcTimeout};
+    use crate::consensus::communication::{MockRaftClient, RpcTimeout};
 
     #[test]
     fn test_election_timeout_creation() {

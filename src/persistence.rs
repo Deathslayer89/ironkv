@@ -445,7 +445,7 @@ impl PersistenceStore {
             }
         }).collect();
         
-        let estimated_snapshot_size = bincode::serialized_size(&serializable_data)? as usize;
+        let estimated_snapshot_size = bincode::serialize(&serializable_data)?.len();
 
         // If AOF is significantly larger than snapshot, rewrite it
         let threshold = estimated_snapshot_size as f64 * (1.0 + config.aof_rewrite_percentage / 100.0);

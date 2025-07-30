@@ -14,11 +14,11 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use kv_cache_core::{
-    consensus::{RaftConsensus, RaftState, RaftRole, RaftTerm, LogEntry, LogIndex, LogTerm},
+    consensus::{RaftConsensus, RaftRole, RaftTerm},
     config::{ClusterConfig, MetricsConfig},
     metrics::MetricsCollector,
     cluster::sharding::ShardManager,
-    membership::{MemberInfo, MemberStatus, HealthStatus, MembershipChange, MembershipChangeType, ChangeStatus},
+    membership::{HealthStatus, MembershipChange, MembershipChangeType, ChangeStatus},
     rebalancing::{RebalancingState, RebalancingOperation, RebalancingType, RebalancingTrigger},
 };
 
@@ -354,7 +354,7 @@ impl MockDistributedCache {
         Ok(())
     }
 
-    pub async fn perform_safety_checks(&self, operation: &RebalancingOperation) -> Result<bool, Box<dyn std::error::Error>> {
+    pub async fn perform_safety_checks(&self, _operation: &RebalancingOperation) -> Result<bool, Box<dyn std::error::Error>> {
         let mut safety = self.safety_coordinator.write().await;
         
         // Perform various safety checks
@@ -827,7 +827,7 @@ mod performance_tests {
         for i in 0..10 {
             let cache_clone = Arc::clone(&cache);
             let handle = tokio::spawn(async move {
-                let node = ClusterNode {
+                let _node = ClusterNode {
                     node_id: format!("node{}", i),
                     address: "127.0.0.1".to_string(),
                     port: 8080 + i as u16,

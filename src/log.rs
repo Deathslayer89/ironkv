@@ -3,15 +3,10 @@
 //! This module provides structured logging using the `tracing` crate with
 //! support for console output, file logging, and log rotation.
 
-use crate::config::{LoggingConfig, LogLevel, LogFormat, LogRotation, LogRotationInterval};
-use std::path::Path;
+use crate::config::{LoggingConfig, LogLevel};
 use std::sync::Once;
 use tracing::Level;
-use tracing_subscriber::{
-    fmt::{self, format::FmtSpan, time::UtcTime},
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-};
+use tracing_subscriber::fmt::{format::FmtSpan, time::UtcTime};
 use std::time::Duration;
 
 static INIT: Once = Once::new();
@@ -81,7 +76,7 @@ pub fn log_cache_operation(
     duration: Duration,
     additional_fields: Option<Vec<(&str, String)>>,
 ) {
-    let mut span = tracing::info_span!(
+    let span = tracing::info_span!(
         "cache_operation",
         operation = operation,
         key = key,
@@ -112,7 +107,7 @@ pub fn log_cluster_operation(
     duration: Duration,
     additional_fields: Option<Vec<(&str, String)>>,
 ) {
-    let mut span = tracing::info_span!(
+    let span = tracing::info_span!(
         "cluster_operation",
         operation = operation,
         node_id = node_id,
@@ -144,7 +139,7 @@ pub fn log_replication_operation(
     duration: Duration,
     additional_fields: Option<Vec<(&str, String)>>,
 ) {
-    let mut span = tracing::info_span!(
+    let span = tracing::info_span!(
         "replication_operation",
         operation = operation,
         follower_id = follower_id,
@@ -178,7 +173,7 @@ pub fn log_network_operation(
     bytes_received: Option<u64>,
     additional_fields: Option<Vec<(&str, String)>>,
 ) {
-    let mut span = tracing::info_span!(
+    let span = tracing::info_span!(
         "network_operation",
         operation = operation,
         remote_addr = remote_addr,
@@ -217,7 +212,7 @@ pub fn log_persistence_operation(
     bytes_written: Option<u64>,
     additional_fields: Option<Vec<(&str, String)>>,
 ) {
-    let mut span = tracing::info_span!(
+    let span = tracing::info_span!(
         "persistence_operation",
         operation = operation,
         file_path = file_path,
@@ -282,7 +277,7 @@ pub fn log_config_reload(path: &str, success: bool) {
 
 /// Log memory usage
 pub fn log_memory_usage(current_bytes: u64, max_bytes: Option<u64>, key_count: usize) {
-    let mut span = tracing::info_span!(
+    let span = tracing::info_span!(
         "memory_usage",
         current_bytes = current_bytes,
         key_count = key_count,

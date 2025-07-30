@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use crate::cluster::communication::KvCacheClient;
-use crate::{TTLStore, Value};
+use crate::TTLStore;
 
 /// Replication strategy for different consistency levels
 #[derive(Debug, Clone, PartialEq)]
@@ -422,7 +422,7 @@ impl ReplicationManager {
             let key_clone = key.clone();
             let value_clone = value.clone();
             let node_id_clone = node_id.clone();
-            let seq_num = sequence_number;
+            let _seq_num = sequence_number;
             
             // Spawn replication task without waiting
             tokio::spawn(async move {

@@ -14,10 +14,10 @@ use super::{
     MembershipState, MemberInfo, MemberStatus, HealthStatus,
     MembershipChange, MembershipChangeType, ChangeStatus,
 };
-use crate::consensus::{RaftConsensus, RaftTerm};
+use crate::consensus::{RaftConsensus};
 use crate::config::ClusterConfig;
 use crate::log::log_cluster_operation;
-use crate::metrics::MetricsCollector;
+
 
 /// Membership change proposal
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,7 +177,7 @@ impl ChangeCoordinator {
         node_id: String,
         state: Arc<RwLock<MembershipState>>,
         consensus: Arc<RaftConsensus>,
-        config: ClusterConfig,
+        _config: ClusterConfig,
         proposal_timeout: Duration,
         voting_timeout: Duration,
         mut stop_rx: mpsc::Receiver<()>,
@@ -201,11 +201,11 @@ impl ChangeCoordinator {
 
     /// Process active proposals
     async fn process_proposals(
-        node_id: &str,
+        _node_id: &str,
         state: &Arc<RwLock<MembershipState>>,
-        consensus: &Arc<RaftConsensus>,
+        _consensus: &Arc<RaftConsensus>,
         proposal_timeout: Duration,
-        voting_timeout: Duration,
+        _voting_timeout: Duration,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut state_guard = state.write().await;
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
@@ -299,7 +299,7 @@ impl ChangeCoordinator {
         vote: VoteValue,
         reason: Option<String>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let vote_record = Vote {
+        let _vote_record = Vote {
             voter: self.node_id.clone(),
             value: vote.clone(),
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
@@ -476,7 +476,7 @@ mod tests {
         let consensus = Arc::new(RaftConsensus::new(
             "node1".to_string(),
             config.clone(),
-            Arc::new(MetricsCollector::new(crate::config::MetricsConfig::default())),
+            Arc::new(crate::metrics::MetricsCollector::new(crate::config::MetricsConfig::default())),
         ));
 
         let coordinator = ChangeCoordinator::new("node1".to_string(), state, consensus, config);
@@ -491,7 +491,7 @@ mod tests {
             node_id: "node1".to_string(),
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
             status: ChangeStatus::Pending,
-            consensus_term: RaftTerm(1),
+            consensus_term: crate::consensus::RaftTerm(1),
         };
 
         let proposal = ChangeProposal {

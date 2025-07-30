@@ -5,11 +5,11 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, RwLock};
+use std::time::{Instant};
+use tokio::sync::{mpsc};
 use serde::{Deserialize, Serialize};
 
-use super::{RebalancingPlan, RebalancingState, RebalancingOperation};
+use super::{RebalancingPlan, RebalancingState};
 use crate::config::ClusterConfig;
 use crate::membership::MembershipManager;
 use crate::log::log_cluster_operation;
@@ -175,9 +175,9 @@ impl RebalancingCommunication {
     /// Run the main communication loop
     async fn run_communication_loop(
         node_id: String,
-        config: ClusterConfig,
-        membership_manager: Arc<MembershipManager>,
-        metrics: Arc<MetricsCollector>,
+        _config: ClusterConfig,
+        _membership_manager: Arc<MembershipManager>,
+        _metrics: Arc<MetricsCollector>,
         mut stop_rx: mpsc::Receiver<()>,
     ) {
         tracing::info!("Communication loop started for node: {}", node_id);

@@ -284,10 +284,10 @@ impl SafetyCoordinator {
 
     /// Perform periodic safety checks
     async fn perform_periodic_checks(
-        node_id: &str,
+        _node_id: &str,
         state: &Arc<RwLock<RebalancingState>>,
-        config: &ClusterConfig,
-        safety_config: &SafetyCheckConfig,
+        _config: &ClusterConfig,
+        _safety_config: &SafetyCheckConfig,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let current_state = state.read().await;
         if *current_state == RebalancingState::Idle {
@@ -445,8 +445,8 @@ impl SafetyCoordinator {
         all_nodes.sort();
         all_nodes.dedup();
 
-        let mut failed_nodes: Vec<String> = Vec::new();
-        for node in &all_nodes {
+        let failed_nodes: Vec<String> = Vec::new();
+        for _node in &all_nodes {
             // TODO: Implement actual connectivity check
             // This would involve:
             // 1. Pinging the node

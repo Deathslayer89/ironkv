@@ -14,7 +14,7 @@ use super::{MembershipState, MemberInfo, MemberStatus, HealthStatus};
 use crate::config::ClusterConfig;
 use crate::cluster::communication::KvCacheClient;
 use crate::log::log_cluster_operation;
-use crate::metrics::MetricsCollector;
+
 
 /// Discovery message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,11 +65,13 @@ pub struct DiscoveryCoordinator {
     /// Background task handle
     task_handle: Option<tokio::task::JoinHandle<()>>,
     /// Known nodes for health checking
+    #[allow(dead_code)]
     known_nodes: HashMap<String, NodeHealthInfo>,
 }
 
 /// Node health information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct NodeHealthInfo {
     /// Node address
     address: String,
@@ -249,7 +251,7 @@ impl DiscoveryCoordinator {
     async fn perform_health_checks(
         node_id: &str,
         state: &Arc<RwLock<MembershipState>>,
-        config: &ClusterConfig,
+        _config: &ClusterConfig,
         failure_timeout: Duration,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let start_time = Instant::now();
@@ -320,7 +322,7 @@ impl DiscoveryCoordinator {
 
     /// Announce this node to the cluster
     pub async fn announce_node(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let message = DiscoveryMessage::Announce {
+        let _message = DiscoveryMessage::Announce {
             node_id: self.node_id.clone(),
             address: self.config.bind_address.clone(),
             port: self.config.port,
@@ -334,7 +336,7 @@ impl DiscoveryCoordinator {
                 continue; // Skip self
             }
 
-            if let Ok(mut client) = KvCacheClient::connect(format!("http://{}", address)).await {
+            if let Ok(_client) = KvCacheClient::connect(format!("http://{}", address)).await {
                 // TODO: Implement announcement RPC
                 tracing::debug!("Announcing to node: {}", member_id);
             }
@@ -360,9 +362,9 @@ impl DiscoveryCoordinator {
                 state_guard.members.insert(node_id, member_info);
                 state_guard.last_update = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
             }
-            DiscoveryMessage::HealthCheck { from_node, timestamp } => {
+            DiscoveryMessage::HealthCheck { from_node: _, timestamp } => {
                 // Respond with health status
-                let response = DiscoveryMessage::HealthResponse {
+                let _response = DiscoveryMessage::HealthResponse {
                     node_id: self.node_id.clone(),
                     status: HealthStatus::Healthy, // TODO: Implement actual health check
                     timestamp,

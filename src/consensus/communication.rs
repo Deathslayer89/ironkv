@@ -225,7 +225,7 @@ impl GrpcRaftClient {
 impl RaftRpc for GrpcRaftClient {
     async fn request_vote(
         &self,
-        target: &str,
+        _target: &str,
         request: RequestVoteRequest,
     ) -> Result<RequestVoteResponse, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = std::time::Instant::now();
@@ -242,7 +242,7 @@ impl RaftRpc for GrpcRaftClient {
             vote_granted: true, // Simplified for demo
         };
         
-        let latency = start_time.elapsed();
+        let _latency = start_time.elapsed();
         // Note: We can't mutate self.stats here due to &self, but in real impl we would
         
         Ok(response)
@@ -250,7 +250,7 @@ impl RaftRpc for GrpcRaftClient {
 
     async fn append_entries(
         &self,
-        target: &str,
+        _target: &str,
         request: AppendEntriesRequest,
     ) -> Result<AppendEntriesResponse, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = std::time::Instant::now();
@@ -267,14 +267,14 @@ impl RaftRpc for GrpcRaftClient {
             conflict_term: None,
         };
         
-        let latency = start_time.elapsed();
+        let _latency = start_time.elapsed();
         
         Ok(response)
     }
 
     async fn install_snapshot(
         &self,
-        target: &str,
+        _target: &str,
         request: InstallSnapshotRequest,
     ) -> Result<InstallSnapshotResponse, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = std::time::Instant::now();
@@ -288,7 +288,7 @@ impl RaftRpc for GrpcRaftClient {
             success: true,
         };
         
-        let latency = start_time.elapsed();
+        let _latency = start_time.elapsed();
         
         Ok(response)
     }

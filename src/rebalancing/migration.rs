@@ -14,13 +14,14 @@ use super::{RebalancingPlan, RebalancingState};
 use crate::config::ClusterConfig;
 use crate::cluster::communication::KvCacheClient;
 use crate::log::log_cluster_operation;
-use crate::metrics::MetricsCollector;
+
 
 // Serialization helpers for SystemTime and Duration
 mod systemtime_serde {
     use super::*;
     use serde::{Deserializer, Serializer};
 
+    #[allow(dead_code)]
     pub fn serialize<S>(time: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -31,6 +32,7 @@ mod systemtime_serde {
         serializer.serialize_u64(millis)
     }
 
+    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<SystemTime, D::Error>
     where
         D: Deserializer<'de>,
@@ -45,6 +47,7 @@ mod systemtime_serde_opt {
     use super::*;
     use serde::{Deserializer, Serializer};
 
+    #[allow(dead_code)]
     pub fn serialize<S>(time: &Option<SystemTime>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -60,6 +63,7 @@ mod systemtime_serde_opt {
         }
     }
 
+    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<SystemTime>, D::Error>
     where
         D: Deserializer<'de>,
@@ -79,6 +83,7 @@ mod duration_serde {
     use super::*;
     use serde::{Deserializer, Serializer};
 
+    #[allow(dead_code)]
     pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -87,6 +92,7 @@ mod duration_serde {
         serializer.serialize_u64(millis)
     }
 
+    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
     where
         D: Deserializer<'de>,
@@ -100,6 +106,7 @@ mod duration_serde_opt {
     use super::*;
     use serde::{Deserializer, Serializer};
 
+    #[allow(dead_code)]
     pub fn serialize<S>(duration: &Option<Duration>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -113,6 +120,7 @@ mod duration_serde_opt {
         }
     }
 
+    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
     where
         D: Deserializer<'de>,
@@ -327,10 +335,10 @@ impl MigrationCoordinator {
 
     /// Process migration batches
     async fn process_migration(
-        node_id: &str,
+        _node_id: &str,
         state: &Arc<RwLock<RebalancingState>>,
-        config: &ClusterConfig,
-        migration_timeout: Duration,
+        _config: &ClusterConfig,
+        _migration_timeout: Duration,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let current_state = state.read().await;
         if *current_state != RebalancingState::InProgress {
@@ -461,6 +469,7 @@ impl MigrationCoordinator {
     }
 
     /// Process a migration batch
+    #[allow(dead_code)]
     async fn process_batch(
         &mut self,
         batch: &mut MigrationBatch,

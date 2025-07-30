@@ -15,7 +15,7 @@ use tokio::time::interval;
 use serde::{Deserialize, Serialize};
 
 use crate::cluster::sharding::{ConsistentHashRing, ShardManager};
-use crate::membership::{MembershipManager, MemberInfo, MemberStatus};
+use crate::membership::MembershipManager;
 use crate::config::ClusterConfig;
 use crate::log::log_cluster_operation;
 use crate::metrics::MetricsCollector;
@@ -55,7 +55,7 @@ mod timestamp_serde_opt {
                 let millis = ts.elapsed().as_millis() as u64;
                 serializer.serialize_some(&millis)
             }
-            None => serializer.serialize_none(),
+            none => serializer.serialize_none(),
         }
     }
 
@@ -329,7 +329,7 @@ impl RebalancingManager {
 
     /// Check if rebalancing is needed
     async fn check_rebalancing_needed(
-        node_id: &str,
+        _node_id: &str,
         state: &Arc<RwLock<RebalancingState>>,
         shard_manager: &Arc<ShardManager>,
         membership_manager: &Arc<MembershipManager>,
@@ -340,7 +340,7 @@ impl RebalancingManager {
         }
 
         // Check membership changes
-        let membership_state = membership_manager.get_membership_state().await;
+        let _membership_state = membership_manager.get_membership_state().await;
         let active_members = membership_manager.get_active_members().await;
 
         // Check if hash ring needs updating
@@ -408,24 +408,24 @@ impl RebalancingManager {
     async fn create_rebalancing_plan(
         &self,
         operation_type: RebalancingType,
-        trigger: RebalancingTrigger,
+        _trigger: RebalancingTrigger,
     ) -> Result<RebalancingPlan, Box<dyn std::error::Error>> {
         let start_time = Instant::now();
 
         // Get current nodes
-        let current_nodes = self.shard_manager.get_nodes().await;
+        let _current_nodes = self.shard_manager.get_nodes().await;
 
         // Get active members
-        let active_members = self.membership_manager.get_active_members().await;
-        let active_node_ids: Vec<String> = active_members.iter().map(|m| m.node_id.clone()).collect();
+        let _active_members = self.membership_manager.get_active_members().await;
+        let _active_node_ids: Vec<String> = _active_members.iter().map(|m| m.node_id.clone()).collect();
 
         // Calculate new hash ring
-        let new_hash_ring = ConsistentHashRing::new(self.config.virtual_nodes_per_physical);
+        let _new_hash_ring = ConsistentHashRing::new(self.config.virtual_nodes_per_physical);
 
         // Calculate key movements
-        let mut source_nodes = HashMap::new();
-        let mut target_nodes = HashMap::new();
-        let mut keys_to_move = Vec::new();
+        let source_nodes = HashMap::new();
+        let target_nodes = HashMap::new();
+        let keys_to_move = Vec::new();
 
         // TODO: Implement actual key movement calculation
         // This is a simplified version - in practice, you'd need to:
@@ -542,7 +542,6 @@ impl std::fmt::Display for RebalancingStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ClusterConfig;
 
     #[tokio::test]
     async fn test_rebalancing_operation_creation() {

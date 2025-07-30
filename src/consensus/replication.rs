@@ -3,14 +3,14 @@
 //! This module provides log replication logic, follower state tracking,
 //! and replication optimization for the Raft consensus algorithm.
 
-use crate::consensus::communication::{AppendEntriesRequest, AppendEntriesResponse, RaftRpc};
+use crate::consensus::communication::{AppendEntriesRequest, RaftRpc};
 use crate::consensus::log::{LogEntry, LogIndex, LogTerm};
 use crate::consensus::state::{RaftState, RaftTerm};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
-use tokio::time::{interval, timeout};
+use tokio::time::interval;
 
 /// Replication state for a follower
 #[derive(Debug, Clone)]
@@ -136,7 +136,7 @@ impl ReplicationManager {
 
         let rpc_client = Arc::clone(&self.rpc_client);
         let members = self.members.clone();
-        let mut replication_states = self.replication_states.clone();
+        let replication_states = self.replication_states.clone();
         let heartbeat_interval = self.heartbeat_interval;
 
         let task_handle = tokio::spawn(async move {
@@ -227,7 +227,7 @@ impl ReplicationManager {
         let current_term = state_guard.current_term;
         let leader_id = state_guard.node_id.clone();
         let commit_index = state_guard.commit_index;
-        let last_log_entry = state_guard.log.read().await.get_last_entry().await?;
+        let _last_log_entry = state_guard.log.read().await.get_last_entry().await?;
         drop(state_guard);
 
         // Send heartbeats to all followers
@@ -322,7 +322,7 @@ impl ReplicationManager {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut state_guard = state.write().await;
         let current_term = state_guard.current_term;
-        let last_log_index = state_guard.log.read().await.get_last_index();
+        let _last_log_index = state_guard.log.read().await.get_last_index();
         
         // Find the highest index that has been replicated to a majority
         let mut match_indices: Vec<u64> = replication_states
@@ -357,7 +357,7 @@ impl ReplicationManager {
 
     /// Get replication statistics
     pub fn get_stats(&self) -> ReplicationStats {
-        let mut total_lag = 0;
+        let total_lag = 0;
         let mut active_followers = 0;
         let mut healthy_followers = 0;
 
