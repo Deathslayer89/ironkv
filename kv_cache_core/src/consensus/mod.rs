@@ -8,6 +8,8 @@ pub mod log;
 pub mod communication;
 pub mod election;
 pub mod replication;
+pub mod grpc_client;
+pub mod grpc_server;
 
 use crate::config::ClusterConfig;
 use crate::log::log_cluster_operation;
@@ -24,8 +26,11 @@ pub use log::{LogEntry, LogIndex, LogTerm};
 pub use communication::{RaftRpc, RequestVoteRequest, RequestVoteResponse, AppendEntriesRequest, AppendEntriesResponse};
 pub use election::{ElectionManager, ElectionTimeout};
 pub use replication::{ReplicationManager, ReplicationState};
+pub use grpc_client::GrpcRaftClient;
+pub use grpc_server::{RaftGrpcServer, create_raft_server};
 
 /// Main Raft consensus manager
+#[derive(Clone)]
 pub struct RaftConsensus {
     /// Current Raft state
     state: Arc<RwLock<RaftState>>,
@@ -52,9 +57,33 @@ impl RaftConsensus {
     ) -> Self {
         let state = Arc::new(RwLock::new(RaftState::new(node_id.clone())));
         
-        // Create mock RPC client for now
+        // Create real gRPC RPC client
         let timeout = crate::consensus::communication::RpcTimeout::default();
-        let rpc_client = Arc::new(crate::consensus::communication::MockRaftClient::new(timeout));
+        let rpc_client = Arc::new(GrpcRaftClient::new(timeout));
+        
+        let members = config.members.clone();
+        let election_manager = ElectionManager::new(rpc_client.clone(), members.clone());
+        let replication_manager = ReplicationManager::new(rpc_client, members.clone());
+        
+        Self {
+            state,
+            election_manager,
+            replication_manager,
+            config,
+            metrics,
+            node_id,
+            members,
+        }
+    }
+
+    /// Create a new Raft consensus instance with custom RPC client
+    pub fn with_rpc_client(
+        node_id: String,
+        config: ClusterConfig,
+        metrics: Arc<MetricsCollector>,
+        rpc_client: Arc<dyn RaftRpc + Send + Sync>,
+    ) -> Self {
+        let state = Arc::new(RwLock::new(RaftState::new(node_id.clone())));
         
         let members = config.members.clone();
         let election_manager = ElectionManager::new(rpc_client.clone(), members.clone());
@@ -106,12 +135,17 @@ impl RaftConsensus {
         Ok(())
     }
 
-    /// Get current Raft state
+    /// Get the current Raft state
     pub async fn get_state(&self) -> RaftState {
         self.state.read().await.clone()
     }
 
-    /// Check if this node is the leader
+    /// Get a reference to the state Arc for gRPC server creation
+    pub fn get_state_arc(&self) -> Arc<RwLock<RaftState>> {
+        Arc::clone(&self.state)
+    }
+
+    /// Check if this node is currently the leader
     pub async fn is_leader(&self) -> bool {
         let state = self.state.read().await;
         state.role == RaftRole::Leader && state.leader_id == Some(self.node_id.clone())

@@ -77,6 +77,19 @@ pub struct ElectionManager {
     task_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
+impl Clone for ElectionManager {
+    fn clone(&self) -> Self {
+        Self {
+            timeout: self.timeout.clone(),
+            rpc_client: Arc::clone(&self.rpc_client),
+            members: self.members.clone(),
+            election_state: self.election_state.clone(),
+            stop_tx: None, // Can't clone sender
+            task_handle: None, // Can't clone JoinHandle
+        }
+    }
+}
+
 /// Election state tracking
 #[derive(Debug, Clone)]
 pub struct ElectionState {

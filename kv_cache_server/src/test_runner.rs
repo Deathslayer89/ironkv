@@ -4,9 +4,9 @@ use tokio::net::TcpListener;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use kv_cache_core::{Store, Value};
 
-pub async fn run_server_for_tests(barrier: Arc<Barrier>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_server_for_tests(barrier: Arc<Barrier>, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let store = Store::new();
-    let listener = TcpListener::bind("127.0.0.1:6379").await?;
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
     
     // Signal that server is ready
     barrier.wait().await;

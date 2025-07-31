@@ -41,6 +41,13 @@ impl std::fmt::Display for LogIndex {
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct LogTerm(pub u64);
 
+impl LogTerm {
+    /// Get the term value
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+}
+
 impl From<RaftTerm> for LogTerm {
     fn from(term: RaftTerm) -> Self {
         LogTerm(term.value())

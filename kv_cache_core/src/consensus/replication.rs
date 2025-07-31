@@ -103,6 +103,19 @@ pub struct ReplicationManager {
     task_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
+impl Clone for ReplicationManager {
+    fn clone(&self) -> Self {
+        Self {
+            rpc_client: Arc::clone(&self.rpc_client),
+            members: self.members.clone(),
+            replication_states: self.replication_states.clone(),
+            heartbeat_interval: self.heartbeat_interval,
+            stop_tx: None, // Can't clone sender
+            task_handle: None, // Can't clone JoinHandle
+        }
+    }
+}
+
 impl ReplicationManager {
     /// Create a new replication manager
     pub fn new(

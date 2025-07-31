@@ -3,34 +3,287 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use kv_cache_core::{TTLStore, Value};
+use kv_cache_core::consensus::RaftConsensus;
+use kv_cache_core::config::{CacheConfig, MetricsConfig};
+use kv_cache_core::metrics::MetricsCollector;
+use tokio::sync::RwLock;
 
 mod client;
 mod protocol;
 
+// Include test modules
 #[cfg(test)]
-mod simple_tests;
-
+mod integration_tests;
 #[cfg(test)]
 mod protocol_tests;
-
+#[cfg(test)]
+mod simple_tests;
 #[cfg(test)]
 mod simple_protocol_test;
+#[cfg(test)]
+mod test_runner;
 
 const DEFAULT_PORT: u16 = 6379;
+const DEFAULT_CLUSTER_PORT: u16 = 6380;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
     
-    if args.len() > 1 && args[1] == "client" {
-        // Run as client
-        client::run_client().await?;
+    // Parse command line arguments
+    let mut cluster_mode = false;
+    let mut config_path = None;
+    let mut node_id = None;
+    let mut cluster_port = DEFAULT_CLUSTER_PORT;
+    
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "client" => {
+                // Run as client
+                return client::run_client().await;
+            }
+            "--cluster" => {
+                cluster_mode = true;
+            }
+            "--config" => {
+                if i + 1 < args.len() {
+                    config_path = Some(args[i + 1].clone());
+                    i += 1;
+                } else {
+                    eprintln!("Error: --config requires a path");
+                    return Err("Missing config path".into());
+                }
+            }
+            "--node-id" => {
+                if i + 1 < args.len() {
+                    node_id = Some(args[i + 1].clone());
+                    i += 1;
+                } else {
+                    eprintln!("Error: --node-id requires a value");
+                    return Err("Missing node-id".into());
+                }
+            }
+            "--cluster-port" => {
+                if i + 1 < args.len() {
+                    cluster_port = args[i + 1].parse().unwrap_or(DEFAULT_CLUSTER_PORT);
+                    i += 1;
+                } else {
+                    eprintln!("Error: --cluster-port requires a value");
+                    return Err("Missing cluster-port".into());
+                }
+            }
+            "--help" => {
+                print_usage();
+                return Ok(());
+            }
+            _ => {
+                eprintln!("Unknown argument: {}", args[i]);
+                print_usage();
+                return Err("Unknown argument".into());
+            }
+        }
+        i += 1;
+    }
+    
+    if cluster_mode {
+        // Run as cluster server
+        run_cluster_server(config_path, node_id, cluster_port).await?;
     } else {
-        // Run as server (default)
+        // Run as single node server (default)
         run_server().await?;
     }
     
     Ok(())
+}
+
+fn print_usage() {
+    println!("IRONKV - High-Performance Distributed Key-Value Cache");
+    println!();
+    println!("Usage:");
+    println!("  kv_cache_server                    # Run in single-node mode");
+    println!("  kv_cache_server --cluster          # Run in cluster mode");
+    println!("  kv_cache_server client             # Run as client");
+    println!();
+    println!("Cluster Mode Options:");
+    println!("  --config <path>                    # Configuration file path");
+    println!("  --node-id <id>                     # Node identifier");
+    println!("  --cluster-port <port>              # Cluster communication port (default: 6380)");
+    println!();
+    println!("Examples:");
+    println!("  kv_cache_server --cluster --node-id node1 --cluster-port 6380");
+    println!("  kv_cache_server --cluster --config cluster.toml");
+}
+
+async fn run_cluster_server(
+    config_path: Option<String>,
+    node_id: Option<String>,
+    cluster_port: u16,
+) -> Result<(), Box<dyn Error>> {
+    println!("🚀 Starting IRONKV in CLUSTER mode");
+    
+    // Load configuration
+    let config = if let Some(path) = config_path {
+        CacheConfig::from_file(&path)?
+    } else {
+        create_default_cluster_config(node_id, cluster_port)
+    };
+    
+    println!("📋 Configuration loaded:");
+    println!("   Node ID: {}", config.cluster.node_id);
+    println!("   Cluster Port: {}", config.cluster.port);
+    println!("   Redis Port: {}", config.server.port);
+    println!("   Cluster Members: {}", config.cluster.members.len());
+    
+    // Initialize metrics
+    let metrics = Arc::new(MetricsCollector::new(config.metrics.clone()));
+    
+    // Create data store
+    let store = Arc::new(TTLStore::new().with_expiration_cleanup());
+    
+    // Create consensus system (not Arc)
+    let mut consensus = RaftConsensus::new(
+        config.cluster.node_id.clone(),
+        config.cluster.clone(),
+        metrics.clone(),
+    );
+    
+    // Start consensus system
+    consensus.start().await?;
+    println!("✅ Consensus system started");
+    
+    // Start Redis protocol server
+    let redis_listener = TcpListener::bind(format!("{}:{}", config.server.bind_address, config.server.port)).await?;
+    println!("✅ Redis server listening on {}:{}", config.server.bind_address, config.server.port);
+    
+    // Start cluster communication server (gRPC)
+    let grpc_addr = format!("{}:{}", config.cluster.bind_address, config.cluster.port).parse()?;
+    println!("✅ Cluster server (gRPC) listening on {}", grpc_addr);
+    
+    // Spawn gRPC server in background
+    let raft_server = kv_cache_core::consensus::create_raft_server(
+        consensus.get_state_arc(),
+        consensus.node_id.clone(),
+    );
+    let grpc_handle = tokio::spawn(async move {
+        tonic::transport::Server::builder()
+            .add_service(raft_server)
+            .serve(grpc_addr)
+            .await
+            .expect("gRPC server failed");
+    });
+    
+    // Handle Redis connections (main task)
+    handle_redis_connections(redis_listener, store, &mut consensus).await?;
+    
+    // Stop consensus system
+    consensus.stop().await?;
+    println!("✅ Consensus system stopped");
+    
+    // Wait for gRPC server to finish (should not happen in normal operation)
+    let _ = grpc_handle.await;
+    
+    Ok(())
+}
+
+async fn handle_redis_connections(
+    listener: TcpListener,
+    store: Arc<TTLStore>,
+    consensus: &mut RaftConsensus,
+) -> Result<(), Box<dyn Error>> {
+    loop {
+        let (socket, addr) = listener.accept().await?;
+        println!("New Redis connection from: {}", addr);
+        
+        let store_clone = Arc::clone(&store);
+        let consensus_clone = consensus.clone();
+        
+        tokio::spawn(async move {
+            if let Err(e) = handle_redis_client(socket, store_clone, &consensus_clone).await {
+                eprintln!("Error handling Redis client {}: {}", addr, e);
+            }
+        });
+    }
+}
+
+async fn handle_redis_client(
+    mut socket: TcpStream,
+    store: Arc<TTLStore>,
+    consensus: &RaftConsensus,
+) -> Result<(), Box<dyn Error>> {
+    let (reader, mut writer) = socket.split();
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+    
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).await?;
+        
+        if bytes_read == 0 {
+            // Client disconnected
+            break;
+        }
+        
+        let response = process_command_with_consensus(&line.trim(), &store, consensus).await;
+        writer.write_all(response.as_bytes()).await?;
+        writer.flush().await?;
+    }
+    
+    Ok(())
+}
+
+async fn process_command_with_consensus(
+    command: &str,
+    store: &TTLStore,
+    consensus: &RaftConsensus,
+) -> String {
+    // Check if we're the leader for write operations
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    
+    if parts.is_empty() {
+        return "-ERR empty command\r\n".to_string();
+    }
+    
+    let is_write_operation = matches!(
+        parts[0].to_uppercase().as_str(),
+        "SET" | "DEL" | "EXPIRE" | "PERSIST" | "LPUSH" | "RPUSH" | "LPOP" | "RPOP" | 
+        "HSET" | "HDEL" | "SADD" | "SREM"
+    );
+    
+    if is_write_operation && !consensus.is_leader().await {
+        // Redirect to leader or return error
+        return "-ERR not leader\r\n".to_string();
+    }
+    
+    // Process command normally
+    process_command(command, store).await
+}
+
+fn create_default_cluster_config(node_id: Option<String>, cluster_port: u16) -> CacheConfig {
+    let mut config = CacheConfig::default();
+    
+    // Set cluster mode
+    config.cluster.enabled = true;
+    config.cluster.node_id = node_id.unwrap_or_else(|| "node1".to_string());
+    config.cluster.bind_address = "127.0.0.1".to_string();
+    config.cluster.port = cluster_port;
+    config.cluster.heartbeat_interval = 50;
+    config.cluster.failure_timeout = 150;
+    config.cluster.replication_factor = 3;
+    
+    // Check for custom Redis port from environment variable
+    if let Ok(port_str) = std::env::var("IRONKV_SERVER_PORT") {
+        if let Ok(port) = port_str.parse::<u16>() {
+            config.server.port = port;
+        }
+    }
+    
+    // Add default cluster members
+    config.cluster.members.insert("node1".to_string(), "127.0.0.1:6380".to_string());
+    config.cluster.members.insert("node2".to_string(), "127.0.0.1:6381".to_string());
+    config.cluster.members.insert("node3".to_string(), "127.0.0.1:6382".to_string());
+    
+    config
 }
 
 async fn run_server() -> Result<(), Box<dyn Error>> {

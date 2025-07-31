@@ -7,6 +7,7 @@ use crate::consensus::log::{LogEntry, LogIndex, LogTerm};
 use crate::consensus::state::RaftTerm;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tracing::{warn, info};
 
 /// Raft RPC trait for communication between nodes
 #[async_trait::async_trait]
@@ -398,6 +399,134 @@ impl RaftRpc for MockRaftClient {
                 success: true,
             }),
         }
+    }
+}
+
+/// Network partition detection and handling
+#[derive(Debug, Clone)]
+pub struct NetworkPartitionDetector {
+    /// Number of consecutive failures before considering a partition
+    pub failure_threshold: u32,
+    /// Time window for failure counting
+    pub failure_window: Duration,
+    /// Detected partitions
+    pub partitions: std::collections::HashMap<String, PartitionInfo>,
+}
+
+/// Information about a detected network partition
+#[derive(Debug, Clone)]
+pub struct PartitionInfo {
+    pub target: String,
+    pub detected_at: std::time::Instant,
+    pub consecutive_failures: u32,
+    pub last_success: Option<std::time::Instant>,
+    pub partition_type: PartitionType,
+}
+
+/// Types of network partitions
+#[derive(Debug, Clone, PartialEq)]
+pub enum PartitionType {
+    /// Complete network isolation
+    Complete,
+    /// Intermittent connectivity issues
+    Intermittent,
+    /// High latency but connectivity exists
+    HighLatency,
+    /// Partial connectivity (some operations fail)
+    Partial,
+}
+
+impl NetworkPartitionDetector {
+    pub fn new(failure_threshold: u32, failure_window: Duration) -> Self {
+        Self {
+            failure_threshold,
+            failure_window,
+            partitions: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Record a failure for a target
+    pub fn record_failure(&mut self, target: &str, error_type: &str) {
+        let now = std::time::Instant::now();
+        let partition = self.partitions.entry(target.to_string()).or_insert_with(|| PartitionInfo {
+            target: target.to_string(),
+            detected_at: now,
+            consecutive_failures: 0,
+            last_success: None,
+            partition_type: PartitionType::Intermittent,
+        });
+
+        partition.consecutive_failures += 1;
+
+        // Determine partition type based on error
+        match error_type {
+            "timeout" | "connection_refused" => {
+                partition.partition_type = PartitionType::Complete;
+            }
+            "unavailable" | "resource_exhausted" => {
+                partition.partition_type = PartitionType::Partial;
+            }
+            "deadline_exceeded" => {
+                partition.partition_type = PartitionType::HighLatency;
+            }
+            _ => {
+                partition.partition_type = PartitionType::Intermittent;
+            }
+        }
+
+        // Check if this constitutes a partition
+        if partition.consecutive_failures >= self.failure_threshold {
+            warn!("Network partition detected for {}: {:?}", target, partition.partition_type);
+        }
+    }
+
+    /// Record a success for a target
+    pub fn record_success(&mut self, target: &str) {
+        let now = std::time::Instant::now();
+        if let Some(partition) = self.partitions.get_mut(target) {
+            partition.consecutive_failures = 0;
+            partition.last_success = Some(now);
+            
+            // If we had a partition and now have success, log recovery
+            if partition.consecutive_failures >= self.failure_threshold {
+                info!("Network partition recovered for {}", target);
+            }
+        }
+    }
+
+    /// Check if a target is currently partitioned
+    pub fn is_partitioned(&self, target: &str) -> bool {
+        if let Some(partition) = self.partitions.get(target) {
+            partition.consecutive_failures >= self.failure_threshold
+        } else {
+            false
+        }
+    }
+
+    /// Get partition information for a target
+    pub fn get_partition_info(&self, target: &str) -> Option<&PartitionInfo> {
+        self.partitions.get(target)
+    }
+
+    /// Get all detected partitions
+    pub fn get_all_partitions(&self) -> Vec<&PartitionInfo> {
+        self.partitions.values().collect()
+    }
+
+    /// Clean up old partition records
+    pub fn cleanup_old_partitions(&mut self) {
+        let now = std::time::Instant::now();
+        self.partitions.retain(|_, partition| {
+            // Keep partitions that are still active or were detected recently
+            partition.consecutive_failures >= self.failure_threshold ||
+            now.duration_since(partition.detected_at) < self.failure_window
+        });
+    }
+}
+
+impl Default for NetworkPartitionDetector {
+    fn default() -> Self {
+        Self::new(3, Duration::from_secs(60))
     }
 }
 

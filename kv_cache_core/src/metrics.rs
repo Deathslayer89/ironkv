@@ -72,6 +72,20 @@ pub struct NetworkMetrics {
     pub network_errors: AtomicU64,
     pub request_timeout_errors: AtomicU64,
     pub network_latency_ms: AtomicU64,
+    // Enhanced network metrics for Phase 1.2
+    pub healthy_connections: AtomicUsize,
+    pub unhealthy_connections: AtomicUsize,
+    pub connection_health_checks: AtomicU64,
+    pub failed_health_checks: AtomicU64,
+    pub network_partitions_detected: AtomicU64,
+    pub connection_pool_size: AtomicUsize,
+    pub connection_pool_evictions: AtomicU64,
+    pub retry_attempts: AtomicU64,
+    pub retry_successes: AtomicU64,
+    pub retry_failures: AtomicU64,
+    pub average_connection_latency_ms: AtomicU64,
+    pub max_connection_latency_ms: AtomicU64,
+    pub min_connection_latency_ms: AtomicU64,
 }
 
 /// Persistence-related metrics
@@ -142,6 +156,19 @@ impl MetricsCollector {
                 network_errors: AtomicU64::new(0),
                 request_timeout_errors: AtomicU64::new(0),
                 network_latency_ms: AtomicU64::new(0),
+                healthy_connections: AtomicUsize::new(0),
+                unhealthy_connections: AtomicUsize::new(0),
+                connection_health_checks: AtomicU64::new(0),
+                failed_health_checks: AtomicU64::new(0),
+                network_partitions_detected: AtomicU64::new(0),
+                connection_pool_size: AtomicUsize::new(0),
+                connection_pool_evictions: AtomicU64::new(0),
+                retry_attempts: AtomicU64::new(0),
+                retry_successes: AtomicU64::new(0),
+                retry_failures: AtomicU64::new(0),
+                average_connection_latency_ms: AtomicU64::new(0),
+                max_connection_latency_ms: AtomicU64::new(0),
+                min_connection_latency_ms: AtomicU64::new(0),
             }),
             persistence: Arc::new(PersistenceMetrics {
                 aof_size_bytes: AtomicU64::new(0),
@@ -297,6 +324,65 @@ impl MetricsCollector {
         metrics::counter!("cache_network_bytes_received_total", bytes_received);
     }
 
+    /// Record connection health check results
+    pub fn record_connection_health_check(&self, healthy: bool, latency_ms: u64) {
+        self.network.connection_health_checks.fetch_add(1, Ordering::Relaxed);
+        
+        if !healthy {
+            self.network.failed_health_checks.fetch_add(1, Ordering::Relaxed);
+        }
+        
+        // Update latency statistics
+        let current_avg = self.network.average_connection_latency_ms.load(Ordering::Relaxed);
+        let total_checks = self.network.connection_health_checks.load(Ordering::Relaxed);
+        
+        if total_checks > 0 {
+            let new_avg = ((current_avg * (total_checks - 1)) + latency_ms) / total_checks;
+            self.network.average_connection_latency_ms.store(new_avg, Ordering::Relaxed);
+        }
+        
+        // Update min/max latency
+        let current_min = self.network.min_connection_latency_ms.load(Ordering::Relaxed);
+        let current_max = self.network.max_connection_latency_ms.load(Ordering::Relaxed);
+        
+        if current_min == 0 || latency_ms < current_min {
+            self.network.min_connection_latency_ms.store(latency_ms, Ordering::Relaxed);
+        }
+        
+        if latency_ms > current_max {
+            self.network.max_connection_latency_ms.store(latency_ms, Ordering::Relaxed);
+        }
+    }
+
+    /// Update connection health counts
+    pub fn update_connection_health_counts(&self, healthy_count: usize, unhealthy_count: usize) {
+        self.network.healthy_connections.store(healthy_count, Ordering::Relaxed);
+        self.network.unhealthy_connections.store(unhealthy_count, Ordering::Relaxed);
+    }
+
+    /// Record connection pool events
+    pub fn record_connection_pool_event(&self, pool_size: usize, evicted: bool) {
+        self.network.connection_pool_size.store(pool_size, Ordering::Relaxed);
+        if evicted {
+            self.network.connection_pool_evictions.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Record retry attempts
+    pub fn record_retry_attempt(&self, success: bool) {
+        self.network.retry_attempts.fetch_add(1, Ordering::Relaxed);
+        if success {
+            self.network.retry_successes.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.network.retry_failures.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Record network partition detection
+    pub fn record_network_partition(&self) {
+        self.network.network_partitions_detected.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Record a cluster operation
     pub fn record_cluster_operation(&self, operation: &str, success: bool, duration: Duration) {
         let duration_ms = duration.as_millis() as u64;
@@ -422,6 +508,19 @@ impl MetricsCollector {
                 connections_established: self.network.connections_established.load(Ordering::Relaxed),
                 connections_closed: self.network.connections_closed.load(Ordering::Relaxed),
                 network_errors: self.network.network_errors.load(Ordering::Relaxed),
+                healthy_connections: self.network.healthy_connections.load(Ordering::Relaxed),
+                unhealthy_connections: self.network.unhealthy_connections.load(Ordering::Relaxed),
+                connection_health_checks: self.network.connection_health_checks.load(Ordering::Relaxed),
+                failed_health_checks: self.network.failed_health_checks.load(Ordering::Relaxed),
+                network_partitions_detected: self.network.network_partitions_detected.load(Ordering::Relaxed),
+                connection_pool_size: self.network.connection_pool_size.load(Ordering::Relaxed),
+                connection_pool_evictions: self.network.connection_pool_evictions.load(Ordering::Relaxed),
+                retry_attempts: self.network.retry_attempts.load(Ordering::Relaxed),
+                retry_successes: self.network.retry_successes.load(Ordering::Relaxed),
+                retry_failures: self.network.retry_failures.load(Ordering::Relaxed),
+                average_connection_latency_ms: self.network.average_connection_latency_ms.load(Ordering::Relaxed),
+                max_connection_latency_ms: self.network.max_connection_latency_ms.load(Ordering::Relaxed),
+                min_connection_latency_ms: self.network.min_connection_latency_ms.load(Ordering::Relaxed),
             },
         }
     }
@@ -470,6 +569,19 @@ pub struct NetworkMetricsSummary {
     pub connections_established: u64,
     pub connections_closed: u64,
     pub network_errors: u64,
+    pub healthy_connections: usize,
+    pub unhealthy_connections: usize,
+    pub connection_health_checks: u64,
+    pub failed_health_checks: u64,
+    pub network_partitions_detected: u64,
+    pub connection_pool_size: usize,
+    pub connection_pool_evictions: u64,
+    pub retry_attempts: u64,
+    pub retry_successes: u64,
+    pub retry_failures: u64,
+    pub average_connection_latency_ms: u64,
+    pub max_connection_latency_ms: u64,
+    pub min_connection_latency_ms: u64,
 }
 
 #[cfg(test)]
