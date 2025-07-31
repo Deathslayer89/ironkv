@@ -17,6 +17,7 @@ pub mod performance;
 pub mod server;
 pub mod shutdown;
 pub mod config_manager;
+pub mod tls_manager;
 
 pub use store::{Store, Key};
 pub use value::Value;
@@ -34,4 +35,5 @@ pub use security::{SecurityManager, User, Role, Permission, AuthResult, AuthzRes
 pub use performance::{ConnectionPool, RequestBatch, PerformanceMonitor, BenchmarkResult, PerformanceReport};
 pub use server::HttpServer;
 pub use config_manager::{ConfigManager, SecretsManager, ConfigValidator, DefaultConfigValidator, ProductionConfigValidator, ConfigValidationResult, ConfigSource};
+pub use tls_manager::{TlsManager, TlsConfig, SecurityHeadersConfig, CorsConfig, RateLimitConfig, RateLimiter, CertificateInfo, TlsVersion};
 pub use shutdown::{ShutdownCoordinator, ShutdownHandle, GracefulShutdownManager, ShutdownComponent, ShutdownSignal};

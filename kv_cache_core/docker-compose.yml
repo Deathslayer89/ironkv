@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  # Redis for rate limiting and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: ironkv-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # IRONKV Node 1 (Leader)
+  ironkv-node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ironkv-node1
+    ports:
+      - "8080:8080"  # HTTP API
+      - "8081:8081"  # gRPC
+      - "9090:9090"  # Metrics
+    volumes:
+      - ./config/node1.toml:/app/config.toml
+      - ironkv_data1:/app/data
+      - ironkv_logs:/app/logs
+      - ./certs:/app/certs:ro
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # IRONKV Node 2 (Follower)
+  ironkv-node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ironkv-node2
+    ports:
+      - "8082:8080"  # HTTP API
+      - "8083:8081"  # gRPC
+      - "9091:9090"  # Metrics
+    volumes:
+      - ./config/node2.toml:/app/config.toml
+      - ironkv_data2:/app/data
+      - ironkv_logs:/app/logs
+      - ./certs:/app/certs:ro
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      ironkv-node1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # IRONKV Node 3 (Follower)
+  ironkv-node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ironkv-node3
+    ports:
+      - "8084:8080"  # HTTP API
+      - "8085:8081"  # gRPC
+      - "9092:9090"  # Metrics
+    volumes:
+      - ./config/node3.toml:/app/config.toml
+      - ironkv_data3:/app/data
+      - ironkv_logs:/app/logs
+      - ./certs:/app/certs:ro
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      ironkv-node1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ironkv-prometheus
+    ports:
+      - "9093:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - ironkv-node1
+      - ironkv-node2
+      - ironkv-node3
+
+  # Grafana for monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ironkv-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
+volumes:
+  redis_data:
+  ironkv_data1:
+  ironkv_data2:
+  ironkv_data3:
+  ironkv_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: ironkv-network 

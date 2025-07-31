@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # IRONKV Node 1
+  - job_name: 'ironkv-node1'
+    static_configs:
+      - targets: ['ironkv-node1:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # IRONKV Node 2
+  - job_name: 'ironkv-node2'
+    static_configs:
+      - targets: ['ironkv-node2:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # IRONKV Node 3
+  - job_name: 'ironkv-node3'
+    static_configs:
+      - targets: ['ironkv-node3:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090'] 

@@ -28,6 +28,8 @@ tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 http = "0.2"
 base64 = "0.21"
+openssl = "0.10"
+axum-server = "0.5"
 
 [build-dependencies]
 tonic-build = "0.10"
