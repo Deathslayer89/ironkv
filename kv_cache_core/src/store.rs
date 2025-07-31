@@ -48,6 +48,27 @@ impl Store {
         data.clear();
     }
 
+    /// Get store statistics
+    pub async fn get_stats(&self) -> Result<StoreStats, Box<dyn std::error::Error>> {
+        let data = self.data.read().await;
+        let total_keys = data.len();
+        let memory_usage_bytes = (total_keys * 100) as u64; // Rough estimate
+        
+        Ok(StoreStats {
+            total_keys,
+            memory_usage_bytes,
+        })
+    }
+
+    /// Get persistence status
+    pub async fn get_persistence_status(&self) -> Result<PersistenceStatus, Box<dyn std::error::Error>> {
+        Ok(PersistenceStatus {
+            aof_enabled: false,
+            snapshot_enabled: false,
+            last_snapshot_time: None,
+        })
+    }
+
     // List operations
     pub async fn lpush(&self, key: Key, value: String) -> Result<usize, String> {
         let mut data = self.data.write().await;
@@ -398,4 +419,19 @@ mod tests {
         assert!(store.hset("mykey".to_string(), "field".to_string(), "value".to_string()).await.is_err());
         assert!(store.sadd("mykey".to_string(), "member".to_string()).await.is_err());
     }
+}
+
+/// Store statistics
+#[derive(Debug, Clone)]
+pub struct StoreStats {
+    pub total_keys: usize,
+    pub memory_usage_bytes: u64,
+}
+
+/// Persistence status
+#[derive(Debug, Clone)]
+pub struct PersistenceStatus {
+    pub aof_enabled: bool,
+    pub snapshot_enabled: bool,
+    pub last_snapshot_time: Option<u64>,
 } 

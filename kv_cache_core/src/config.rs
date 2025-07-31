@@ -25,6 +25,12 @@ pub struct CacheConfig {
     pub metrics: MetricsConfig,
     /// Tracing configuration
     pub tracing: TracingConfig,
+    /// Health check configuration
+    pub health: HealthConfig,
+    /// Security configuration
+    pub security: SecurityConfig,
+    /// Performance configuration
+    pub performance: PerformanceConfig,
 }
 
 /// Server-specific configuration
@@ -254,6 +260,111 @@ pub struct TracingConfig {
     pub max_span_duration: u64,
 }
 
+/// Health check configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthConfig {
+    /// Enable health checks
+    pub enabled: bool,
+    /// Health check interval in seconds
+    pub check_interval: u64,
+    /// Health check timeout in seconds
+    pub timeout: u64,
+    /// Enable health check endpoints
+    pub enable_endpoints: bool,
+    /// Health check endpoint path
+    pub endpoint_path: String,
+    /// Enable detailed health checks
+    pub detailed: bool,
+    /// Health check failure threshold
+    pub failure_threshold: usize,
+    /// Health check success threshold
+    pub success_threshold: usize,
+}
+
+/// Security configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    /// Enable authentication
+    pub enable_auth: bool,
+    /// Enable authorization
+    pub enable_authz: bool,
+    /// Enable TLS/SSL
+    pub enable_tls: bool,
+    /// TLS certificate file path
+    pub tls_cert_path: Option<String>,
+    /// TLS private key file path
+    pub tls_key_path: Option<String>,
+    /// Enable audit logging
+    pub enable_audit_log: bool,
+    /// Maximum audit log entries
+    pub max_audit_log_entries: usize,
+    /// Session timeout in seconds
+    pub session_timeout: u64,
+    /// Create default admin user
+    pub create_default_admin: bool,
+    /// Default admin password
+    pub default_admin_password: String,
+    /// Password policy
+    pub password_policy: PasswordPolicy,
+    /// Rate limiting
+    pub rate_limiting: RateLimitingConfig,
+}
+
+/// Password policy configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasswordPolicy {
+    /// Minimum password length
+    pub min_length: usize,
+    /// Require uppercase letters
+    pub require_uppercase: bool,
+    /// Require lowercase letters
+    pub require_lowercase: bool,
+    /// Require numbers
+    pub require_numbers: bool,
+    /// Require special characters
+    pub require_special: bool,
+    /// Maximum password age in days
+    pub max_age_days: Option<u32>,
+}
+
+/// Rate limiting configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimitingConfig {
+    /// Enable rate limiting
+    pub enabled: bool,
+    /// Maximum requests per minute
+    pub max_requests_per_minute: usize,
+    /// Maximum failed login attempts
+    pub max_failed_logins: usize,
+    /// Account lockout duration in minutes
+    pub lockout_duration_minutes: u64,
+}
+
+/// Performance configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceConfig {
+    /// Maximum number of connections in pool
+    pub max_connections: usize,
+    /// Connection idle timeout in seconds
+    pub connection_idle_timeout: u64,
+    /// Connection maximum age in seconds
+    pub connection_max_age: u64,
+    /// Enable request batching
+    pub enable_batching: bool,
+    /// Batch minimum size
+    pub batch_min_size: usize,
+    /// Batch maximum size
+    pub batch_max_size: usize,
+    /// Batch maximum wait time in milliseconds
+    pub batch_max_wait_time_ms: u64,
+    /// Enable performance monitoring
+    pub enable_monitoring: bool,
+    /// Benchmark warmup operations
+    pub benchmark_warmup_operations: usize,
+    /// Performance monitoring interval in seconds
+    pub monitoring_interval: u64,
+}
+
 impl CacheConfig {
     /// Load configuration from a file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
@@ -382,6 +493,9 @@ impl Default for CacheConfig {
             logging: LoggingConfig::default(),
             metrics: MetricsConfig::default(),
             tracing: TracingConfig::default(),
+            health: HealthConfig::default(),
+            security: SecurityConfig::default(),
+            performance: PerformanceConfig::default(),
         }
     }
 }
@@ -497,6 +611,81 @@ impl Default for TracingConfig {
             otel_endpoint: None,
             local_spans: true,
             max_span_duration: 60,
+        }
+    }
+}
+
+impl Default for HealthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            check_interval: 30,
+            timeout: 5,
+            enable_endpoints: true,
+            endpoint_path: "/health".to_string(),
+            detailed: true,
+            failure_threshold: 3,
+            success_threshold: 2,
+        }
+    }
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            enable_auth: false,
+            enable_authz: false,
+            enable_tls: false,
+            tls_cert_path: None,
+            tls_key_path: None,
+            enable_audit_log: true,
+            max_audit_log_entries: 10000,
+            session_timeout: 3600, // 1 hour
+            create_default_admin: true,
+            default_admin_password: "admin123".to_string(),
+            password_policy: PasswordPolicy::default(),
+            rate_limiting: RateLimitingConfig::default(),
+        }
+    }
+}
+
+impl Default for PasswordPolicy {
+    fn default() -> Self {
+        Self {
+            min_length: 8,
+            require_uppercase: true,
+            require_lowercase: true,
+            require_numbers: true,
+            require_special: false,
+            max_age_days: Some(90),
+        }
+    }
+}
+
+impl Default for RateLimitingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_requests_per_minute: 1000,
+            max_failed_logins: 5,
+            lockout_duration_minutes: 15,
+        }
+    }
+}
+
+impl Default for PerformanceConfig {
+    fn default() -> Self {
+        Self {
+            max_connections: 100,
+            connection_idle_timeout: 300, // 5 minutes
+            connection_max_age: 3600, // 1 hour
+            enable_batching: true,
+            batch_min_size: 10,
+            batch_max_size: 1000,
+            batch_max_wait_time_ms: 50, // 50ms
+            enable_monitoring: true,
+            benchmark_warmup_operations: 1000,
+            monitoring_interval: 60, // 1 minute
         }
     }
 }
