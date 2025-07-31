@@ -14,6 +14,7 @@ pub mod trace;
 pub mod health;
 pub mod security;
 pub mod performance;
+pub mod server;
 pub mod shutdown;
 
 pub use store::{Store, Key};
@@ -30,4 +31,5 @@ pub use metrics::{MetricsCollector, MetricsSummary};
 pub use health::{HealthChecker, HealthCheck, HealthStatus, HealthResponse, HealthCheckResult};
 pub use security::{SecurityManager, User, Role, Permission, AuthResult, AuthzResult, AuditLogEntry};
 pub use performance::{ConnectionPool, RequestBatch, PerformanceMonitor, BenchmarkResult, PerformanceReport};
+pub use server::HttpServer;
 pub use shutdown::{ShutdownCoordinator, ShutdownHandle, GracefulShutdownManager, ShutdownComponent, ShutdownSignal};

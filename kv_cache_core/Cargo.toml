@@ -23,6 +23,10 @@ metrics-exporter-prometheus = "0.12"
 async-trait = "0.1"
 rand = "0.8"
 hex = "0.4"
+axum = "0.6"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+http = "0.2"
 
 [build-dependencies]
 tonic-build = "0.10"
