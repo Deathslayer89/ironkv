@@ -16,6 +16,7 @@ pub mod security;
 pub mod performance;
 pub mod server;
 pub mod shutdown;
+pub mod config_manager;
 
 pub use store::{Store, Key};
 pub use value::Value;
@@ -32,4 +33,5 @@ pub use health::{HealthChecker, HealthCheck, HealthStatus, HealthResponse, Healt
 pub use security::{SecurityManager, User, Role, Permission, AuthResult, AuthzResult, AuditLogEntry};
 pub use performance::{ConnectionPool, RequestBatch, PerformanceMonitor, BenchmarkResult, PerformanceReport};
 pub use server::HttpServer;
+pub use config_manager::{ConfigManager, SecretsManager, ConfigValidator, DefaultConfigValidator, ProductionConfigValidator, ConfigValidationResult, ConfigSource};
 pub use shutdown::{ShutdownCoordinator, ShutdownHandle, GracefulShutdownManager, ShutdownComponent, ShutdownSignal};

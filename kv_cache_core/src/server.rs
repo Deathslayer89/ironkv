@@ -67,7 +67,7 @@ impl HttpServer {
     }
 
     /// Create the router with all endpoints
-    fn create_router(&self) -> Router {
+    pub fn create_router(&self) -> Router {
         let state = Arc::new(self.clone_state());
 
         Router::new()
