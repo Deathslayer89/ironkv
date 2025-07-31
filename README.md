@@ -351,9 +351,7 @@ curl http://localhost:9090/cluster/status
 journalctl -u ironkv | grep cluster
 ```
 
-## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### Development Setup
 ```bash
