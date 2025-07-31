@@ -46,6 +46,8 @@ pub struct RaftConsensus {
     pub node_id: String,
     /// Cluster members
     members: HashMap<String, String>,
+    /// State machine store (for applying committed commands)
+    store: Option<Arc<crate::ttl::TTLStore>>,
 }
 
 impl RaftConsensus {
@@ -73,6 +75,7 @@ impl RaftConsensus {
             metrics,
             node_id,
             members,
+            store: None,
         }
     }
 
@@ -97,6 +100,7 @@ impl RaftConsensus {
             metrics,
             node_id,
             members,
+            store: None,
         }
     }
 
@@ -195,6 +199,61 @@ impl RaftConsensus {
         );
 
         result
+    }
+
+    /// Apply committed log entries to the state machine
+    pub async fn apply_committed_entries(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Get the current commit index and last applied index
+        let (commit_index, last_applied) = {
+            let state = self.state.read().await;
+            (state.commit_index, state.last_applied)
+        };
+        
+        // Apply any new committed entries
+        for index in (last_applied.0 + 1)..=commit_index.0 {
+            let log_index = LogIndex(index);
+            
+            // Get the log entry
+            let entry = {
+                let state = self.state.read().await;
+                let log = state.log.read().await;
+                log.get_entry(log_index).await?
+            };
+            
+            if let Some(entry) = entry {
+                // Apply the command to the state machine
+                self.apply_command(&entry.command).await?;
+                
+                // Update last applied index
+                let mut state = self.state.write().await;
+                state.last_applied = log_index;
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Set the state machine store
+    pub fn set_store(&mut self, store: Arc<crate::ttl::TTLStore>) {
+        self.store = Some(store);
+    }
+
+    /// Apply a command to the state machine
+    async fn apply_command(&self, command: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        if let Ok(command_str) = String::from_utf8(command.to_vec()) {
+            let parts: Vec<&str> = command_str.split_whitespace().collect();
+            if parts.len() >= 3 && parts[0] == "SET" {
+                let key = parts[1].to_string();
+                let value = parts[2..].join(" ");
+                println!("Applying SET command: {} = {}", key, value);
+                
+                // Apply to the store if available
+                if let Some(store) = &self.store {
+                    store.set(key, crate::value::Value::String(value), None).await;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Handle RequestVote RPC

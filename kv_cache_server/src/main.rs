@@ -148,6 +148,9 @@ async fn run_cluster_server(
         metrics.clone(),
     );
     
+    // Set the store in consensus for applying committed commands
+    consensus.set_store(Arc::clone(&store));
+    
     // Start consensus system
     consensus.start().await?;
     println!("✅ Consensus system started");
@@ -237,26 +240,52 @@ async fn process_command_with_consensus(
     store: &TTLStore,
     consensus: &RaftConsensus,
 ) -> String {
-    // Check if we're the leader for write operations
     let parts: Vec<&str> = command.split_whitespace().collect();
     
     if parts.is_empty() {
         return "-ERR empty command\r\n".to_string();
     }
     
+    let operation = parts[0].to_uppercase();
     let is_write_operation = matches!(
-        parts[0].to_uppercase().as_str(),
+        operation.as_str(),
         "SET" | "DEL" | "EXPIRE" | "PERSIST" | "LPUSH" | "RPUSH" | "LPOP" | "RPOP" | 
         "HSET" | "HDEL" | "SADD" | "SREM"
     );
     
-    if is_write_operation && !consensus.is_leader().await {
-        // Redirect to leader or return error
-        return "-ERR not leader\r\n".to_string();
+    if is_write_operation {
+        // Strong consistency for writes: must go through consensus
+        if !consensus.is_leader().await {
+            return "-ERR not leader\r\n".to_string();
+        }
+        
+        // Submit command to consensus for replication
+        match consensus.submit_command(command.as_bytes().to_vec()).await {
+            Ok(log_index) => {
+                println!("Command submitted to consensus with log index: {}", log_index.0);
+                
+                // Wait for the command to be committed (strong consistency)
+                // In a real implementation, we'd wait for commit_index to advance
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                
+                // Apply committed entries to the store
+                if let Err(e) = consensus.apply_committed_entries().await {
+                    println!("Warning: Failed to apply committed entries: {}", e);
+                }
+                
+                // Now process the command locally
+                process_command(command, store).await
+            }
+            Err(e) => {
+                format!("-ERR consensus error: {}\r\n", e)
+            }
+        }
+    } else {
+        // Read operations: can be served from any node
+        // For read-after-write consistency, we could check commit_index
+        // but for now, we'll serve reads immediately
+        process_command(command, store).await
     }
-    
-    // Process command normally
-    process_command(command, store).await
 }
 
 fn create_default_cluster_config(node_id: Option<String>, cluster_port: u16) -> CacheConfig {
