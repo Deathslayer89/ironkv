@@ -6,6 +6,7 @@
 use crate::consensus::communication::{RaftRpc, RequestVoteRequest};
 use crate::consensus::log::LogTerm;
 use crate::consensus::state::{RaftState};
+use crate::RaftTerm;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -26,10 +27,16 @@ pub struct ElectionTimeout {
 impl ElectionTimeout {
     /// Create a new election timeout with default values
     pub fn new() -> Self {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let min_timeout_ms = 150;
+        let max_timeout_ms = 300;
+        let current_timeout_ms = rng.gen_range(min_timeout_ms..=max_timeout_ms);
+        
         Self {
-            min_timeout_ms: 150,
-            max_timeout_ms: 300,
-            current_timeout_ms: 150,
+            min_timeout_ms,
+            max_timeout_ms,
+            current_timeout_ms,
         }
     }
 
@@ -69,8 +76,6 @@ pub struct ElectionManager {
     rpc_client: Arc<dyn RaftRpc + Send + Sync>,
     /// Cluster members
     members: HashMap<String, String>,
-    /// Election state
-    election_state: ElectionState,
     /// Control channel for stopping the manager
     stop_tx: Option<mpsc::Sender<()>>,
     /// Background task handle
@@ -83,86 +88,15 @@ impl Clone for ElectionManager {
             timeout: self.timeout.clone(),
             rpc_client: Arc::clone(&self.rpc_client),
             members: self.members.clone(),
-            election_state: self.election_state.clone(),
             stop_tx: None, // Can't clone sender
             task_handle: None, // Can't clone JoinHandle
         }
     }
 }
 
-/// Election state tracking
-#[derive(Debug, Clone)]
-pub struct ElectionState {
-    /// Current election round
-    pub election_round: u64,
-    /// Number of votes received in current election
-    pub votes_received: u32,
-    /// Total number of nodes in cluster
-    pub total_nodes: u32,
-    /// Last election start time
-    pub election_start_time: Option<Instant>,
-    /// Whether an election is currently in progress
-    pub election_in_progress: bool,
-    /// Last time we received a message from the leader
-    pub last_leader_contact: Option<Instant>,
-}
-
-impl ElectionState {
-    /// Create a new election state
-    pub fn new(total_nodes: u32) -> Self {
-        Self {
-            election_round: 0,
-            votes_received: 0,
-            total_nodes,
-            election_start_time: None,
-            election_in_progress: false,
-            last_leader_contact: None,
-        }
-    }
-
-    /// Start a new election
-    pub fn start_election(&mut self) {
-        self.election_round += 1;
-        self.votes_received = 1; // Vote for self
-        self.election_start_time = Some(Instant::now());
-        self.election_in_progress = true;
-    }
-
-    /// End the current election
-    pub fn end_election(&mut self) {
-        self.election_in_progress = false;
-        self.election_start_time = None;
-    }
-
-    /// Add a vote
-    pub fn add_vote(&mut self) {
-        self.votes_received += 1;
-    }
-
-    /// Check if we have majority
-    pub fn has_majority(&self) -> bool {
-        self.votes_received > (self.total_nodes / 2)
-    }
-
-    /// Get majority threshold
-    pub fn majority_threshold(&self) -> u32 {
-        (self.total_nodes / 2) + 1
-    }
-
-    /// Update leader contact time
-    pub fn update_leader_contact(&mut self) {
-        self.last_leader_contact = Some(Instant::now());
-    }
-
-    /// Check if election timeout has expired
-    pub fn is_timeout_expired(&self, timeout_duration: Duration) -> bool {
-        if let Some(last_contact) = self.last_leader_contact {
-            last_contact.elapsed() > timeout_duration
-        } else {
-            true
-        }
-    }
-}
+// Remove ElectionState struct and its impl
+// Move any necessary fields (election_round, votes_received, election_start_time, election_in_progress, last_leader_contact) to RaftState if not already present
+// Update all logic to use RaftState for election state
 
 impl ElectionManager {
     /// Create a new election manager
@@ -175,7 +109,6 @@ impl ElectionManager {
             timeout: ElectionTimeout::new(),
             rpc_client,
             members,
-            election_state: ElectionState::new(total_nodes),
             stop_tx: None,
             task_handle: None,
         }
@@ -192,10 +125,9 @@ impl ElectionManager {
         let timeout = self.timeout.clone();
         let rpc_client = Arc::clone(&self.rpc_client);
         let members = self.members.clone();
-        let election_state = self.election_state.clone();
 
         let task_handle = tokio::spawn(async move {
-            Self::run_election_loop(state, timeout, rpc_client, members, election_state, stop_rx).await;
+            Self::run_election_loop(state, timeout, rpc_client, members, stop_rx).await;
         });
 
         self.task_handle = Some(task_handle);
@@ -227,7 +159,6 @@ impl ElectionManager {
         mut timeout: ElectionTimeout,
         rpc_client: Arc<dyn RaftRpc + Send + Sync>,
         members: HashMap<String, String>,
-        mut election_state: ElectionState,
         mut stop_rx: mpsc::Receiver<()>,
     ) {
         let mut interval = interval(Duration::from_millis(10)); // Check every 10ms
@@ -241,7 +172,6 @@ impl ElectionManager {
                         &mut timeout,
                         &rpc_client,
                         &members,
-                        &mut election_state,
                     ).await {
                         tracing::error!("Error in election check");
                     }
@@ -260,22 +190,22 @@ impl ElectionManager {
         timeout: &mut ElectionTimeout,
         rpc_client: &Arc<dyn RaftRpc + Send + Sync>,
         members: &HashMap<String, String>,
-        election_state: &mut ElectionState,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut state_guard = state.write().await;
 
         // Check if we're a follower and timeout has expired
-        if state_guard.is_follower() && election_state.is_timeout_expired(timeout.duration()) {
-            tracing::info!("Election timeout expired, starting election");
+        if state_guard.is_follower() && state_guard.is_election_timeout_expired(timeout.duration()) {
+            println!("Election: Timeout expired for node {}, starting election with timeout {:?}", state_guard.node_id, timeout.duration());
             
             // Become candidate
             state_guard.become_candidate();
-            election_state.start_election();
+            state_guard.start_election();
             timeout.reset();
+            println!("Election: Reset timeout to {:?} for node {}", timeout.duration(), state_guard.node_id);
 
             // Start election process
             drop(state_guard); // Release lock before async call
-            Self::run_election(state, rpc_client, members, election_state).await?;
+            Self::run_election(state, rpc_client, members).await?;
         }
 
         Ok(())
@@ -286,13 +216,14 @@ impl ElectionManager {
         state: &Arc<RwLock<RaftState>>,
         rpc_client: &Arc<dyn RaftRpc + Send + Sync>,
         members: &HashMap<String, String>,
-        election_state: &mut ElectionState,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let state_guard = state.read().await;
         let current_term = state_guard.current_term;
         let candidate_id = state_guard.node_id.clone();
         let last_log_entry = state_guard.log.read().await.get_last_entry().await?;
         drop(state_guard);
+
+        println!("Election: Node {} starting election for term {}", candidate_id, current_term);
 
         // Send RequestVote to all other nodes
         let mut vote_tasks = Vec::new();
@@ -302,6 +233,8 @@ impl ElectionManager {
                 continue; // Skip self
             }
 
+            println!("Election: Sending request_vote to {} at {}", node_id, address);
+
             let request = RequestVoteRequest {
                 term: current_term,
                 candidate_id: candidate_id.clone(),
@@ -310,11 +243,13 @@ impl ElectionManager {
             };
 
             let rpc_client = Arc::clone(rpc_client);
-            let node_id = node_id.clone();
+            let node_id_clone = node_id.clone();
             let address = address.clone();
 
             let task = tokio::spawn(async move {
-                rpc_client.request_vote(&address, request).await
+                let result = rpc_client.request_vote(&address, request).await;
+                println!("Election: request_vote result for {}: {:?}", node_id_clone, result);
+                result
             });
 
             vote_tasks.push((node_id, task));
@@ -329,17 +264,20 @@ impl ElectionManager {
                 Ok(Ok(response)) => {
                     if response.term > current_term {
                         higher_term = Some(response.term);
+                        println!("Election: Found higher term {} from {}", response.term, node_id);
                         break;
                     } else if response.vote_granted {
                         votes_received += 1;
-                        tracing::info!("Received vote from node: {}", node_id);
+                        println!("Election: Received vote from node: {} (total: {})", node_id, votes_received);
+                    } else {
+                        println!("Election: Vote denied by node: {}", node_id);
                     }
                 }
                 Ok(Err(e)) => {
-                    tracing::warn!("Failed to get vote from node {}: {}", node_id, e);
+                    println!("Election: Failed to get vote from node {}: {}", node_id, e);
                 }
                 Err(e) => {
-                    tracing::warn!("Task failed for node {}: {}", node_id, e);
+                    println!("Election: Task failed for node {}: {}", node_id, e);
                 }
             }
         }
@@ -348,8 +286,8 @@ impl ElectionManager {
         if let Some(higher_term) = higher_term {
             let mut state_guard = state.write().await;
             state_guard.update_term(higher_term);
-            election_state.end_election();
-            tracing::info!("Found higher term {}, becoming follower", higher_term);
+            state_guard.end_election();
+            println!("Election: Found higher term {}, becoming follower", higher_term);
             return Ok(());
         }
 
@@ -357,23 +295,27 @@ impl ElectionManager {
         if votes_received > (members.len() as u32 / 2) {
             let mut state_guard = state.write().await;
             state_guard.become_leader();
-            election_state.end_election();
-            tracing::info!("Won election with {} votes, becoming leader", votes_received);
+            state_guard.end_election();
+            println!("Election: Won election with {} votes, becoming leader", votes_received);
         } else {
-            // Election failed, stay as candidate
-            tracing::info!("Election failed with {} votes, remaining candidate", votes_received);
+            // Election failed, increment term and try again
+            let mut state_guard = state.write().await;
+            state_guard.update_term(RaftTerm(current_term.value() + 1));
+            state_guard.end_election();
+            println!("Election: Election failed with {} votes, incrementing term to {}", votes_received, current_term.value() + 1);
         }
 
         Ok(())
     }
 
     /// Get election statistics
-    pub fn get_stats(&self) -> ElectionStats {
+    pub async fn get_stats(&self, state: &Arc<RwLock<RaftState>>) -> ElectionStats {
+        let state_guard = state.read().await;
         ElectionStats {
-            election_round: self.election_state.election_round,
-            votes_received: self.election_state.votes_received,
-            total_nodes: self.election_state.total_nodes,
-            election_in_progress: self.election_state.election_in_progress,
+            election_round: state_guard.election_round,
+            votes_received: state_guard.votes_received,
+            total_nodes: state_guard.total_nodes,
+            election_in_progress: state_guard.election_in_progress,
             current_timeout_ms: self.timeout.current_timeout_ms,
         }
     }
@@ -428,40 +370,6 @@ mod tests {
         assert!(timeout.current_timeout_ms <= 200);
     }
 
-    #[test]
-    fn test_election_state_creation() {
-        let state = ElectionState::new(5);
-        assert_eq!(state.election_round, 0);
-        assert_eq!(state.votes_received, 0);
-        assert_eq!(state.total_nodes, 5);
-        assert!(!state.election_in_progress);
-    }
-
-    #[test]
-    fn test_election_state_start_election() {
-        let mut state = ElectionState::new(3);
-        state.start_election();
-        
-        assert_eq!(state.election_round, 1);
-        assert_eq!(state.votes_received, 1); // Vote for self
-        assert!(state.election_in_progress);
-        assert!(state.election_start_time.is_some());
-    }
-
-    #[test]
-    fn test_election_state_majority() {
-        let mut state = ElectionState::new(3);
-        
-        // Need 2 votes for majority (3/2 + 1 = 2)
-        assert_eq!(state.majority_threshold(), 2);
-        
-        state.add_vote();
-        assert!(!state.has_majority());
-        
-        state.add_vote();
-        assert!(state.has_majority());
-    }
-
     #[tokio::test]
     async fn test_election_manager_creation() {
         let timeout = RpcTimeout::default();
@@ -469,7 +377,7 @@ mod tests {
         let members = HashMap::new();
         
         let manager = ElectionManager::new(rpc_client, members);
-        assert_eq!(manager.election_state.total_nodes, 0);
+        assert_eq!(manager.timeout.current_timeout_ms, 150);
     }
 
     #[tokio::test]
@@ -479,7 +387,7 @@ mod tests {
         let members = HashMap::new();
         
         let manager = ElectionManager::new(rpc_client, members);
-        let stats = manager.get_stats();
+        let stats = manager.get_stats(&Arc::new(RwLock::new(RaftState::new("node1".to_string())))).await;
         
         assert_eq!(stats.election_round, 0);
         assert_eq!(stats.total_nodes, 0);

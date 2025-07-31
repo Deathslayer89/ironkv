@@ -80,6 +80,9 @@ pub struct RaftState {
     pub votes_received: u32,
     /// Total number of nodes in the cluster
     pub total_nodes: u32,
+    pub election_round: u64,
+    pub election_start_time: Option<std::time::Instant>,
+    pub election_in_progress: bool,
 }
 
 impl RaftState {
@@ -99,6 +102,9 @@ impl RaftState {
             last_leader_contact: None,
             votes_received: 0,
             total_nodes: 1,
+            election_round: 0,
+            election_start_time: None,
+            election_in_progress: false,
         }
     }
 
@@ -135,6 +141,7 @@ impl RaftState {
         self.voted_for = Some(self.node_id.clone());
         self.votes_received = 1; // Vote for self
         self.last_leader_contact = None;
+        self.start_election();
     }
 
     /// Become a leader
@@ -146,12 +153,10 @@ impl RaftState {
     }
 
     /// Check if election timeout has expired
-    pub fn is_election_timeout_expired(&self) -> bool {
+    pub fn is_election_timeout_expired(&self, timeout: std::time::Duration) -> bool {
         if let Some(last_contact) = self.last_leader_contact {
-            let timeout_duration = std::time::Duration::from_millis(self.election_timeout_ms);
-            last_contact.elapsed() > timeout_duration
+            last_contact.elapsed() > timeout
         } else {
-            // No leader contact, consider timeout expired
             true
         }
     }
@@ -242,6 +247,17 @@ impl RaftState {
             election_timeout_ms: self.election_timeout_ms,
             heartbeat_interval_ms: self.heartbeat_interval_ms,
         }
+    }
+
+    pub fn start_election(&mut self) {
+        self.election_round += 1;
+        self.votes_received = 1; // Vote for self
+        self.election_start_time = Some(std::time::Instant::now());
+        self.election_in_progress = true;
+    }
+    pub fn end_election(&mut self) {
+        self.election_in_progress = false;
+        self.election_start_time = None;
     }
 }
 
