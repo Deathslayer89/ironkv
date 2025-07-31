@@ -92,3 +92,4 @@ config.local.toml
 config.local.yaml
 docs/
 .claude/
+init.md
