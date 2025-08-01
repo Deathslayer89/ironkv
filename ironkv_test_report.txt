@@ -1,0 +1,57 @@
+============================================================
+IRONKV CLUSTER TEST REPORT
+============================================================
+
+📋 BASIC OPERATIONS
+----------------------------------------
+  SET: ✅ PASS
+  GET: ✅ PASS
+  DEL: ✅ PASS
+  PING_node1: ✅ PASS
+  PING_node2: ✅ PASS
+  PING_node3: ✅ PASS
+  TTL_SET: ✅ PASS
+  TTL_GET: ❌ FAIL
+
+📋 CONCURRENT OPERATIONS
+----------------------------------------
+  concurrent_operations: ✅ PASS
+  success_rate: 1.00
+
+📋 ERROR HANDLING
+----------------------------------------
+  invalid_command_INVALID_COMMAND: ✅ PASS
+  invalid_command_SET: ✅ PASS
+  invalid_command_GET: ✅ PASS
+  invalid_command_SET key: ✅ PASS
+  invalid_command_GET nonexistent_key: ✅ PASS
+  follower_write_rejection_node1: ✅ PASS
+  follower_write_rejection_node3: ✅ PASS
+
+📋 PERFORMANCE
+----------------------------------------
+  set_operations_per_sec: 9.82
+  get_operations_per_sec: 15093.02
+  set_success_rate: 1.00
+  get_success_rate: 1.00
+
+📋 FAILOVER
+----------------------------------------
+  leader_killed: ✅ PASS
+  failover_success: ✅ PASS
+  new_leader_write: ✅ PASS
+  leader_restart: ✅ PASS
+  cluster_healthy: ✅ PASS
+
+📋 DATA PERSISTENCE
+----------------------------------------
+  data_set: ❌ FAIL
+
+============================================================
+SUMMARY
+============================================================
+Total Tests: 22
+Passed: 20
+Failed: 2
+Success Rate: 90.9%
+⚠️ Some tests failed. Check the logs for details.
