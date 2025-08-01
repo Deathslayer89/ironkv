@@ -257,5 +257,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Include expected vs actual behavior
 
 ---
-
-**🎉 Your IRONKV cluster is now ready for production use!**
