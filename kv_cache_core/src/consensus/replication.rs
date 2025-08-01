@@ -143,7 +143,7 @@ impl ReplicationManager {
     pub async fn start(
         &mut self,
         state: Arc<RwLock<RaftState>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let (stop_tx, stop_rx) = mpsc::channel(1);
         self.stop_tx = Some(stop_tx);
 
@@ -168,7 +168,7 @@ impl ReplicationManager {
     }
 
     /// Stop the replication manager
-    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if let Some(stop_tx) = self.stop_tx.take() {
             let _ = stop_tx.send(()).await;
         }
@@ -184,7 +184,7 @@ impl ReplicationManager {
     pub async fn replicate_log_entry(
         &self,
         log_index: LogIndex,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // This would be called by the leader when a new entry is added
         // In a real implementation, this would trigger replication to all followers
         tracing::debug!("Replicating log entry {} to followers", log_index);
@@ -229,7 +229,7 @@ impl ReplicationManager {
         rpc_client: &Arc<dyn RaftRpc + Send + Sync>,
         members: &HashMap<String, String>,
         replication_states: &mut HashMap<String, ReplicationState>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let state_guard = state.read().await;
         
         // Only send heartbeats if we're the leader
@@ -332,7 +332,7 @@ impl ReplicationManager {
     async fn update_commit_index(
         state: &Arc<RwLock<RaftState>>,
         replication_states: &HashMap<String, ReplicationState>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut state_guard = state.write().await;
         let current_term = state_guard.current_term;
         let _last_log_index = state_guard.log.read().await.get_last_index();

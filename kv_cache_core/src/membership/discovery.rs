@@ -108,7 +108,7 @@ impl DiscoveryCoordinator {
     }
 
     /// Start the discovery coordinator
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Starting discovery coordinator for node: {}", self.node_id);
 
         let (stop_tx, stop_rx) = mpsc::channel(1);
@@ -139,7 +139,7 @@ impl DiscoveryCoordinator {
     }
 
     /// Stop the discovery coordinator
-    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Stopping discovery coordinator for node: {}", self.node_id);
 
         if let Some(stop_tx) = self.stop_tx.take() {
@@ -191,7 +191,7 @@ impl DiscoveryCoordinator {
         node_id: &str,
         state: &Arc<RwLock<MembershipState>>,
         config: &ClusterConfig,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
 
         // Check configured members
@@ -253,7 +253,7 @@ impl DiscoveryCoordinator {
         state: &Arc<RwLock<MembershipState>>,
         _config: &ClusterConfig,
         failure_timeout: Duration,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
         let mut state_guard = state.write().await;
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
@@ -321,7 +321,7 @@ impl DiscoveryCoordinator {
     }
 
     /// Announce this node to the cluster
-    pub async fn announce_node(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn announce_node(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let _message = DiscoveryMessage::Announce {
             node_id: self.node_id.clone(),
             address: self.config.bind_address.clone(),
@@ -346,7 +346,7 @@ impl DiscoveryCoordinator {
     }
 
     /// Handle incoming discovery message
-    pub async fn handle_message(&self, message: DiscoveryMessage) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn handle_message(&self, message: DiscoveryMessage) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         match message {
             DiscoveryMessage::Announce { node_id, address, port, datacenter, timestamp } => {
                 let mut state_guard = self.state.write().await;

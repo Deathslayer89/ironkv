@@ -105,7 +105,7 @@ impl RaftConsensus {
     }
 
     /// Start the Raft consensus system
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Starting Raft consensus for node: {}", self.node_id);
         
         // Initialize as follower
@@ -126,7 +126,7 @@ impl RaftConsensus {
     }
 
     /// Stop the Raft consensus system
-    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Stopping Raft consensus for node: {}", self.node_id);
         
         // Stop election manager
@@ -159,7 +159,7 @@ impl RaftConsensus {
     pub async fn submit_command(
         &self,
         command: Vec<u8>,
-    ) -> Result<LogIndex, Box<dyn std::error::Error>> {
+    ) -> Result<LogIndex, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
         
         // Check if we're the leader
@@ -202,7 +202,7 @@ impl RaftConsensus {
     }
 
     /// Apply committed log entries to the state machine
-    pub async fn apply_committed_entries(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn apply_committed_entries(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Get the current commit index and last applied index
         let (commit_index, last_applied) = {
             let state = self.state.read().await;
@@ -239,7 +239,7 @@ impl RaftConsensus {
     }
 
     /// Apply a command to the state machine
-    async fn apply_command(&self, command: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    async fn apply_command(&self, command: &[u8]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if let Ok(command_str) = String::from_utf8(command.to_vec()) {
             let parts: Vec<&str> = command_str.split_whitespace().collect();
             if parts.len() >= 3 && parts[0] == "SET" {
@@ -260,7 +260,7 @@ impl RaftConsensus {
     pub async fn handle_request_vote(
         &self,
         request: RequestVoteRequest,
-    ) -> Result<RequestVoteResponse, Box<dyn std::error::Error>> {
+    ) -> Result<RequestVoteResponse, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
         
         let mut state = self.state.write().await;
@@ -315,7 +315,7 @@ impl RaftConsensus {
     pub async fn handle_append_entries(
         &self,
         request: AppendEntriesRequest,
-    ) -> Result<AppendEntriesResponse, Box<dyn std::error::Error>> {
+    ) -> Result<AppendEntriesResponse, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
         
         let mut state = self.state.write().await;

@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # IRONKV Node 1 (Leader)
+  ironkv-node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ironkv-node1
+    ports:
+      - "6379:6379"  # Redis protocol
+      - "6380:6380"  # Cluster communication
+      - "9090:9090"  # Metrics
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - IRONKV_NODE_ID=node1
+      - IRONKV_CLUSTER_PORT=6380
+      - IRONKV_SERVER_PORT=6379
+      - IRONKV_METRICS_PORT=9090
+      - IRONKV_CLUSTER_MEMBERS=node1:127.0.0.1:6380,node2:127.0.0.1:6381,node3:127.0.0.1:6382
+    volumes:
+      - ironkv_data1:/var/lib/ironkv
+      - ironkv_logs:/var/log/ironkv
+    networks:
+      - ironkv-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # IRONKV Node 2 (Follower)
+  ironkv-node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ironkv-node2
+    ports:
+      - "6381:6379"  # Redis protocol (different host port)
+      - "6382:6380"  # Cluster communication
+      - "9091:9090"  # Metrics
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - IRONKV_NODE_ID=node2
+      - IRONKV_CLUSTER_PORT=6380
+      - IRONKV_SERVER_PORT=6379
+      - IRONKV_METRICS_PORT=9090
+      - IRONKV_CLUSTER_MEMBERS=node1:ironkv-node1:6380,node2:ironkv-node2:6380,node3:ironkv-node3:6380
+    volumes:
+      - ironkv_data2:/var/lib/ironkv
+      - ironkv_logs:/var/log/ironkv
+    networks:
+      - ironkv-network
+    depends_on:
+      ironkv-node1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # IRONKV Node 3 (Follower)
+  ironkv-node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ironkv-node3
+    ports:
+      - "6383:6379"  # Redis protocol (different host port)
+      - "6384:6380"  # Cluster communication
+      - "9092:9090"  # Metrics
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - IRONKV_NODE_ID=node3
+      - IRONKV_CLUSTER_PORT=6380
+      - IRONKV_SERVER_PORT=6379
+      - IRONKV_METRICS_PORT=9090
+      - IRONKV_CLUSTER_MEMBERS=node1:ironkv-node1:6380,node2:ironkv-node2:6380,node3:ironkv-node3:6380
+    volumes:
+      - ironkv_data3:/var/lib/ironkv
+      - ironkv_logs:/var/log/ironkv
+    networks:
+      - ironkv-network
+    depends_on:
+      ironkv-node1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ironkv-prometheus
+    ports:
+      - "9093:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - ironkv-network
+    depends_on:
+      - ironkv-node1
+      - ironkv-node2
+      - ironkv-node3
+
+  # Grafana for monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ironkv-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - ironkv-network
+    depends_on:
+      - prometheus
+
+volumes:
+  ironkv_data1:
+  ironkv_data2:
+  ironkv_data3:
+  ironkv_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  ironkv-network:
+    driver: bridge 

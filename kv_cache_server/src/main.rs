@@ -4,9 +4,8 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use kv_cache_core::{TTLStore, Value};
 use kv_cache_core::consensus::RaftConsensus;
-use kv_cache_core::config::{CacheConfig, MetricsConfig};
+use kv_cache_core::config::CacheConfig;
 use kv_cache_core::metrics::MetricsCollector;
-use tokio::sync::RwLock;
 
 mod client;
 mod protocol;
@@ -152,7 +151,7 @@ async fn run_cluster_server(
     consensus.set_store(Arc::clone(&store));
     
     // Start consensus system
-    consensus.start().await?;
+    consensus.start().await.map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     println!("✅ Consensus system started");
     
     // Start Redis protocol server
@@ -180,7 +179,7 @@ async fn run_cluster_server(
     handle_redis_connections(redis_listener, store, &mut consensus).await?;
     
     // Stop consensus system
-    consensus.stop().await?;
+    consensus.stop().await.map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     println!("✅ Consensus system stopped");
     
     // Wait for gRPC server to finish (should not happen in normal operation)
@@ -203,7 +202,7 @@ async fn handle_redis_connections(
         
         tokio::spawn(async move {
             if let Err(e) = handle_redis_client(socket, store_clone, &consensus_clone).await {
-                eprintln!("Error handling Redis client {}: {}", addr, e);
+                eprintln!("Error handling Redis client {}: {}", addr, e.to_string());
             }
         });
     }
@@ -270,14 +269,14 @@ async fn process_command_with_consensus(
                 
                 // Apply committed entries to the store
                 if let Err(e) = consensus.apply_committed_entries().await {
-                    println!("Warning: Failed to apply committed entries: {}", e);
+                    println!("Warning: Failed to apply committed entries: {}", e.to_string());
                 }
                 
                 // Now process the command locally
                 process_command(command, store).await
             }
             Err(e) => {
-                format!("-ERR consensus error: {}\r\n", e)
+                format!("-ERR consensus error: {}\r\n", e.to_string())
             }
         }
     } else {
@@ -300,17 +299,36 @@ fn create_default_cluster_config(node_id: Option<String>, cluster_port: u16) -> 
     config.cluster.failure_timeout = 150;
     config.cluster.replication_factor = 3;
     
-    // Check for custom Redis port from environment variable
-    if let Ok(port_str) = std::env::var("IRONKV_SERVER_PORT") {
-        if let Ok(port) = port_str.parse::<u16>() {
-            config.server.port = port;
+    // Set Redis port based on node ID
+    let redis_port = match config.cluster.node_id.as_str() {
+        "node1" => 6379,
+        "node2" => 6381,
+        "node3" => 6383,
+        _ => {
+            // Check for custom Redis port from environment variable
+            if let Ok(port_str) = std::env::var("IRONKV_SERVER_PORT") {
+                port_str.parse::<u16>().unwrap_or(6379)
+            } else {
+                6379
+            }
         }
+    };
+    config.server.port = redis_port;
+    
+    // Ensure cluster port is different from Redis port
+    if config.cluster.port == config.server.port {
+        config.cluster.port = match config.cluster.node_id.as_str() {
+            "node1" => 6380,
+            "node2" => 6382,
+            "node3" => 6384,
+            _ => config.cluster.port + 1,
+        };
     }
     
-    // Add default cluster members
+    // Add default cluster members with correct cluster ports
     config.cluster.members.insert("node1".to_string(), "127.0.0.1:6380".to_string());
-    config.cluster.members.insert("node2".to_string(), "127.0.0.1:6381".to_string());
-    config.cluster.members.insert("node3".to_string(), "127.0.0.1:6382".to_string());
+    config.cluster.members.insert("node2".to_string(), "127.0.0.1:6382".to_string());
+    config.cluster.members.insert("node3".to_string(), "127.0.0.1:6384".to_string());
     
     config
 }

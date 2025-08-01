@@ -186,7 +186,7 @@ impl RaftGrpcServer {
     async fn handle_request_vote(
         &self,
         request: RequestVoteRequest,
-    ) -> Result<RequestVoteResponse, Box<dyn std::error::Error>> {
+    ) -> Result<RequestVoteResponse, Box<dyn std::error::Error + Send + Sync>> {
         let mut state = self.state.write().await;
         
         // If request term is less than current term, reject
@@ -230,7 +230,7 @@ impl RaftGrpcServer {
     async fn handle_append_entries(
         &self,
         request: AppendEntriesRequest,
-    ) -> Result<AppendEntriesResponse, Box<dyn std::error::Error>> {
+    ) -> Result<AppendEntriesResponse, Box<dyn std::error::Error + Send + Sync>> {
         let mut state = self.state.write().await;
         
         // If request term is less than current term, reject
@@ -310,7 +310,7 @@ impl RaftGrpcServer {
     async fn handle_install_snapshot(
         &self,
         request: InstallSnapshotRequest,
-    ) -> Result<InstallSnapshotResponse, Box<dyn std::error::Error>> {
+    ) -> Result<InstallSnapshotResponse, Box<dyn std::error::Error + Send + Sync>> {
         let mut state = self.state.write().await;
         
         // If request term is less than current term, reject

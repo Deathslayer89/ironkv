@@ -142,7 +142,7 @@ impl RaftLog {
     }
 
     /// Append a log entry
-    pub async fn append(&mut self, entry: LogEntry) -> Result<LogIndex, Box<dyn std::error::Error>> {
+    pub async fn append(&mut self, entry: LogEntry) -> Result<LogIndex, Box<dyn std::error::Error + Send + Sync>> {
         // Validate entry
         if entry.index.value() != self.next_index.value() {
             return Err(format!(
@@ -176,7 +176,7 @@ impl RaftLog {
     }
 
     /// Get a log entry by index
-    pub async fn get_entry(&self, index: LogIndex) -> Result<Option<LogEntry>, Box<dyn std::error::Error>> {
+    pub async fn get_entry(&self, index: LogIndex) -> Result<Option<LogEntry>, Box<dyn std::error::Error + Send + Sync>> {
         if index.is_first() {
             // Return a dummy entry for index 0
             return Ok(Some(LogEntry::new(RaftTerm(0), LogIndex(0), vec![])));
@@ -186,7 +186,7 @@ impl RaftLog {
     }
 
     /// Get the last log entry
-    pub async fn get_last_entry(&self) -> Result<LogEntry, Box<dyn std::error::Error>> {
+    pub async fn get_last_entry(&self) -> Result<LogEntry, Box<dyn std::error::Error + Send + Sync>> {
         if self.last_index.is_first() {
             return Ok(LogEntry::new(RaftTerm(0), LogIndex(0), vec![]));
         }
@@ -212,7 +212,7 @@ impl RaftLog {
     }
 
     /// Get the size of the log
-    pub fn get_size(&self) -> Result<usize, Box<dyn std::error::Error>> {
+    pub fn get_size(&self) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.entries.len())
     }
 
@@ -222,7 +222,7 @@ impl RaftLog {
     }
 
     /// Truncate the log from a specific index
-    pub async fn truncate_from(&mut self, index: LogIndex) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn truncate_from(&mut self, index: LogIndex) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut to_remove = Vec::new();
         
         for (entry_index, entry) in &self.entries {
@@ -253,7 +253,7 @@ impl RaftLog {
     }
 
     /// Compact the log by removing old entries
-    pub async fn compact(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn compact(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if self.compacted {
             return Ok(());
         }
@@ -294,7 +294,7 @@ impl RaftLog {
         &self,
         start_index: LogIndex,
         end_index: LogIndex,
-    ) -> Result<Vec<LogEntry>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<LogEntry>, Box<dyn std::error::Error + Send + Sync>> {
         let mut entries = Vec::new();
         
         for index in start_index.value()..=end_index.value() {

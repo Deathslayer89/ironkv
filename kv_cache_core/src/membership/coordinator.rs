@@ -127,7 +127,7 @@ impl ChangeCoordinator {
     }
 
     /// Start the change coordinator
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Starting change coordinator for node: {}", self.node_id);
 
         let (stop_tx, stop_rx) = mpsc::channel(1);
@@ -158,7 +158,7 @@ impl ChangeCoordinator {
     }
 
     /// Stop the change coordinator
-    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Stopping change coordinator for node: {}", self.node_id);
 
         if let Some(stop_tx) = self.stop_tx.take() {
@@ -206,7 +206,7 @@ impl ChangeCoordinator {
         _consensus: &Arc<RaftConsensus>,
         proposal_timeout: Duration,
         _voting_timeout: Duration,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut state_guard = state.write().await;
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
 
@@ -248,7 +248,7 @@ impl ChangeCoordinator {
     pub async fn propose_change(
         &self,
         change: MembershipChange,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
         let current_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
         let change_id = change.change_id.clone();
@@ -273,7 +273,7 @@ impl ChangeCoordinator {
         // Submit to consensus if we're the leader
         if self.consensus.is_leader().await {
             let command = serde_json::to_vec(&proposal)?;
-            self.consensus.submit_command(command).await?;
+            self.consensus.submit_command(command).await.map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error + Send + Sync>)?;
         }
 
         // Record metrics
@@ -298,7 +298,7 @@ impl ChangeCoordinator {
         proposal_id: &str,
         vote: VoteValue,
         reason: Option<String>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let _vote_record = Vote {
             voter: self.node_id.clone(),
             value: vote.clone(),
@@ -316,7 +316,7 @@ impl ChangeCoordinator {
     pub async fn apply_change(
         &self,
         change: &MembershipChange,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
 
         let mut state_guard = self.state.write().await;
@@ -384,7 +384,7 @@ impl ChangeCoordinator {
     pub async fn rollback_change(
         &self,
         change: &MembershipChange,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = Instant::now();
 
         let mut state_guard = self.state.write().await;

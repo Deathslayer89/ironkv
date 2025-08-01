@@ -118,7 +118,7 @@ impl ElectionManager {
     pub async fn start(
         &mut self,
         state: Arc<RwLock<RaftState>>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let (stop_tx, stop_rx) = mpsc::channel(1);
         self.stop_tx = Some(stop_tx);
 
@@ -135,7 +135,7 @@ impl ElectionManager {
     }
 
     /// Stop the election manager
-    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if let Some(stop_tx) = self.stop_tx.take() {
             let _ = stop_tx.send(()).await;
         }
@@ -190,7 +190,7 @@ impl ElectionManager {
         timeout: &mut ElectionTimeout,
         rpc_client: &Arc<dyn RaftRpc + Send + Sync>,
         members: &HashMap<String, String>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut state_guard = state.write().await;
 
         // Check if we're a follower and timeout has expired
@@ -216,7 +216,7 @@ impl ElectionManager {
         state: &Arc<RwLock<RaftState>>,
         rpc_client: &Arc<dyn RaftRpc + Send + Sync>,
         members: &HashMap<String, String>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let state_guard = state.read().await;
         let current_term = state_guard.current_term;
         let candidate_id = state_guard.node_id.clone();

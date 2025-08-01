@@ -182,7 +182,7 @@ impl MembershipManager {
     }
 
     /// Start the membership manager
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Starting membership manager for node: {}", self.node_id);
 
         // Start discovery coordinator
@@ -196,7 +196,7 @@ impl MembershipManager {
     }
 
     /// Stop the membership manager
-    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn stop(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Stopping membership manager for node: {}", self.node_id);
 
         // Stop discovery coordinator
@@ -216,7 +216,7 @@ impl MembershipManager {
         _address: String,
         _port: u16,
         _datacenter: Option<String>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = SystemTime::now();
 
         let change = MembershipChange {
@@ -251,7 +251,7 @@ impl MembershipManager {
         &self,
         node_id: String,
         graceful: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start_time = SystemTime::now();
 
         let change = MembershipChange {
